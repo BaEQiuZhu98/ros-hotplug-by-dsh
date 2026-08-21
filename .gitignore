@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Node / DSH
+node_modules/
+dist/
+*.log
+
+# ROS2 / colcon
+build/
+install/
+log/
+
+# MuJoCo / artifacts
+*.mp4
+*.gif
+render/
+results/
+*.csv
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
