@@ -17,15 +17,24 @@
 
 ---
 
-## 2. Third-party timestamp (recommended)
+## 2. Third-party timestamp (done)
 
 | Field | Value |
 |---|---|
-| Timestamp service | `[TBD: OriginStamp / FreeTSA (RFC3161) / OpenTimestamps …]` |
-| Stamped file | `[TBD]` (suggest stamping the hash of `DESIGN.md` or a repo tarball) |
-| File hash (SHA-256) | `[TBD]` |
-| Timestamp receipt / transaction ID | `[TBD]` |
-| Stamp time | `[TBD]` |
+| Timestamp service | FreeTSA (RFC 3161, https://freetsa.org) |
+| Stamped file 1 | `DESIGN.zh.md` |
+| File 1 SHA-256 | `79dcee268e2225219f6702b7a278aba76b262343f2365245970774f4436b2932` |
+| File 1 receipt | `docs/timestamps/DESIGN.zh.md.tsr` |
+| File 1 stamp time | `2026-08-21T03:19:40Z` |
+| Stamped file 2 | `docs/novelty-claim.zh.md` |
+| File 2 SHA-256 | `a3420acc8cb3dcb8901fc3e61b7f209400730f5e4e2dbbfc3e6f5bb8b7e7e25e` |
+| File 2 receipt | `docs/timestamps/novelty-claim.zh.md.tsr` |
+| File 2 stamp time | `2026-08-21T03:19:41Z` |
+| Verification CA | `docs/timestamps/freetsa-cacert.pem` |
+| Verification result | `openssl ts -verify` → `Verification: OK` |
+
+> Offline verification (anyone can re-check):
+> `openssl ts -verify -data DESIGN.zh.md -in docs/timestamps/DESIGN.zh.md.tsr -CAfile docs/timestamps/freetsa-cacert.pem`
 
 ---
 

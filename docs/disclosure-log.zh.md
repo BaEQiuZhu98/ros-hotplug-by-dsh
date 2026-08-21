@@ -17,15 +17,24 @@
 
 ---
 
-## 2. 第三方时间戳（推荐）
+## 2. 第三方时间戳（已完成）
 
 | 字段 | 值 |
 |---|---|
-| 时间戳服务 | `[TBD: OriginStamp / FreeTSA(RFC3161) / OpenTimestamps 等]` |
-| 被盖戳文件 | `[TBD]`（建议对 `DESIGN.zh.md` 或整个仓库 tarball 的哈希盖戳） |
-| 文件哈希（SHA-256） | `[TBD]` |
-| 时间戳回执/交易 ID | `[TBD]` |
-| 盖戳时间 | `[TBD]` |
+| 时间戳服务 | FreeTSA（RFC 3161，https://freetsa.org） |
+| 盖戳文件 1 | `DESIGN.zh.md` |
+| 文件 1 SHA-256 | `79dcee268e2225219f6702b7a278aba76b262343f2365245970774f4436b2932` |
+| 文件 1 回执 | `docs/timestamps/DESIGN.zh.md.tsr` |
+| 文件 1 盖戳时间 | `2026-08-21T03:19:40Z` |
+| 盖戳文件 2 | `docs/novelty-claim.zh.md` |
+| 文件 2 SHA-256 | `a3420acc8cb3dcb8901fc3e61b7f209400730f5e4e2dbbfc3e6f5bb8b7e7e25e` |
+| 文件 2 回执 | `docs/timestamps/novelty-claim.zh.md.tsr` |
+| 文件 2 盖戳时间 | `2026-08-21T03:19:41Z` |
+| 验证 CA | `docs/timestamps/freetsa-cacert.pem` |
+| 验证结果 | `openssl ts -verify` → `Verification: OK` |
+
+> 离线验证命令（任何人可复核）：
+> `openssl ts -verify -data DESIGN.zh.md -in docs/timestamps/DESIGN.zh.md.tsr -CAfile docs/timestamps/freetsa-cacert.pem`
 
 ---
 
