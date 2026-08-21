@@ -83,6 +83,10 @@
 | Retry 策略 | 请求失败在持久步骤边界自动重试 | demo/13 可靠性设计 |
 | MCP 客户端 | 用标准协议接外部工具服务器 | plugin 之外接 ROS2 的另一种方式(可选) |
 | Client 插件/slots | 给 web GUI 加 UI(client 半) | 机械臂状态面板(可选) |
+| 动态 Cordis 插件生命周期 | cordis_define 定义不可变 package, cordis_run/update 激活, cordis_stop 停用, cordis_undefine 删除 | 本项目提交+续写/文档同步两个 web 插件; demo/13 版本时序原型 |
+| Client↔Host RPC | Client 半部 host.call 调 Host 半部 harness.handle 注册的包私有 JSON 方法 | 本项目 web 插件点按钮→跑 git→回传状态 |
+| Slots 槽位 + inputActions | 往 web GUI 注入 UI(conversation.input.dock 等), inputActions.setDraft+submit 触发 agent | 本项目 demo 进度面板 / 同步文档面板 |
+| Inspect 提供者 | 写插件前用 cordis_inspect_list/query/self 查运行时 Service/Event/Slot/Builtin 契约 | 写插件不硬编码接口, 以运行时为准 |
 
 ### 易混淆概念区分
 

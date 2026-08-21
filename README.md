@@ -90,10 +90,10 @@ See [`DESIGN.md`](DESIGN.md) section 8.
 
 ---
 
-## Quick start (placeholder)
+## Quick start
 
-> TBD: environment setup + running `demo/00-dsh-quickstart`.
+> Start from [`demo/00-dsh-quickstart`](demo/00-dsh-quickstart): install DSH → set the key → run the first agent; the robotics part starts at [`demo/06-ros2-mujoco-env`](demo/06-ros2-mujoco-env) with the ROS2 + MuJoCo environment.
 
-## Disclosure & evidence (placeholder)
+## Disclosure & evidence
 
-> TBD: first public commit hash, third-party timestamp receipt, publication links.
+> First public commit, FreeTSA timestamp receipts, and publication links: see [`docs/disclosure-log.md`](docs/disclosure-log.md).

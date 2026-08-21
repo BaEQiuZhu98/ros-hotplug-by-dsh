@@ -141,9 +141,9 @@ MuJoCo 仿真（Franka + 末端执行器 + 场景）
 
 ---
 
-## 11. 披露与时间戳（占位）
+## 11. 披露与时间戳
 
-> 待补：首次公开 commit hash、第三方时间戳服务回执、发布链接。
+> 首次公开 commit、FreeTSA 时间戳回执、发布链接见 [`docs/disclosure-log.zh.md`](docs/disclosure-log.zh.md)。
 
 ---
 

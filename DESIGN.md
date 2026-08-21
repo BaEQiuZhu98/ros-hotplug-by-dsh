@@ -141,9 +141,9 @@ MuJoCo simulation (Franka + end-effectors + scene)
 
 ---
 
-## 11. Disclosure & timestamp (placeholder)
+## 11. Disclosure & timestamp
 
-> TBD: first public commit hash, third-party timestamp receipt, publication links.
+> First public commit, FreeTSA timestamp receipts, and publication links: see [`docs/disclosure-log.md`](docs/disclosure-log.md).
 
 ---
 

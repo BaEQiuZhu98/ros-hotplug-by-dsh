@@ -90,10 +90,10 @@ ros-hotplug-by-dsh/
 
 ---
 
-## 快速开始（占位）
+## 快速开始
 
-> 待补：环境安装 + 跑通 `demo/00-dsh-quickstart`。
+> 从 [`demo/00-dsh-quickstart`](demo/00-dsh-quickstart) 开始：装 DSH → 配 key → 跑通第一个 agent；机器人部分从 [`demo/06-ros2-mujoco-env`](demo/06-ros2-mujoco-env) 搭 ROS2 + MuJoCo 环境。
 
-## 披露与留证（占位）
+## 披露与留证
 
-> 待补：首次公开 commit hash、第三方时间戳回执、发布链接。
+> 首次公开 commit、FreeTSA 时间戳回执、发布链接见 [`docs/disclosure-log.zh.md`](docs/disclosure-log.zh.md)。

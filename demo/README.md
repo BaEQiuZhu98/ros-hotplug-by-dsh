@@ -83,6 +83,10 @@ Every demo directory follows the same four-part README:
 | retry policy | auto-retry failed requests at durable step boundaries | demo/13 reliability design |
 | MCP client | connect external tool servers via a standard protocol | alternative to plugins for reaching ROS2 (optional) |
 | client plugin/slots | add UI to the web GUI (client half) | robot status panel (optional) |
+| dynamic Cordis plugin lifecycle | cordis_define defines an immutable package, cordis_run/update activates, cordis_stop stops, cordis_undefine deletes | this project's two web plugins (commit+continue / doc-sync); demo/13 version-timeline prototype |
+| client↔host RPC | the client half calls the host half via host.call on a package-private JSON method registered by harness.handle | this project's "button → run git → return status" |
+| slots + inputActions | inject UI into the web GUI (conversation.input.dock etc.), and inputActions.setDraft+submit triggers the agent | this project's demo-progress panel / doc-sync panel |
+| Inspect providers | query runtime Service/Event/Slot/Builtin contracts with cordis_inspect_list/query/self before writing a plugin | write plugins against the runtime, not hardcoded interfaces |
 
 ### Easily-confused pairs
 
