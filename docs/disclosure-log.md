@@ -9,11 +9,11 @@
 
 | Field | Value |
 |---|---|
-| First commit hash | `[TBD]` |
-| First commit time (committer date) | `[TBD]` |
+| First commit hash | `0a31b4b24d1c7cb007af04128189dbaf802b573b` |
+| First commit time (committer date) | `2026-08-21T11:05:15+08:00` |
 | Repository URL | `git@github.com:BaEQiuZhu98/ros-hotplug-by-dsh.git` |
-| First push time | `[TBD]` |
-| Repository visibility | `[TBD: public / private]` |
+| First push time | `2026-08-21T11:08:53+08:00` |
+| Repository visibility | `public` |
 
 ---
 
@@ -33,7 +33,7 @@
 
 | Channel | Link | Publish time |
 |---|---|---|
-| GitHub repo | `[TBD]` | `[TBD]` |
+| GitHub repo | `https://github.com/BaEQiuZhu98/ros-hotplug-by-dsh` | `2026-08-21T11:08:53+08:00` |
 | Blog/community (Zhihu/Juejin/Medium…) | `[TBD]` | `[TBD]` |
 | arXiv preprint | `[TBD]` | `[TBD]` |
 | Demo video (Bilibili/YouTube) | `[TBD]` | `[TBD]` |

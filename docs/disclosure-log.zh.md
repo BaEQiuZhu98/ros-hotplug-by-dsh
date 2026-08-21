@@ -9,11 +9,11 @@
 
 | 字段 | 值 |
 |---|---|
-| 首次提交 commit hash | `[TBD]` |
-| 首次提交时间（committer date） | `[TBD]` |
+| 首次提交 commit hash | `0a31b4b24d1c7cb007af04128189dbaf802b573b` |
+| 首次提交时间（committer date） | `2026-08-21T11:05:15+08:00` |
 | 仓库地址 | `git@github.com:BaEQiuZhu98/ros-hotplug-by-dsh.git` |
-| 首次推送时间 | `[TBD]` |
-| 仓库可见性 | `[TBD: public / private]` |
+| 首次推送时间 | `2026-08-21T11:08:53+08:00` |
+| 仓库可见性 | `public` |
 
 ---
 
@@ -33,7 +33,7 @@
 
 | 渠道 | 链接 | 发布时间 |
 |---|---|---|
-| GitHub 仓库 | `[TBD]` | `[TBD]` |
+| GitHub 仓库 | `https://github.com/BaEQiuZhu98/ros-hotplug-by-dsh` | `2026-08-21T11:08:53+08:00` |
 | 博客/社区（知乎/掘金/Medium…） | `[TBD]` | `[TBD]` |
 | arXiv 预印本 | `[TBD]` | `[TBD]` |
 | 演示视频（B站/YouTube） | `[TBD]` | `[TBD]` |
