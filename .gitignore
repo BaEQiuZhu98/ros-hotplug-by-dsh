@@ -27,3 +27,6 @@ results/
 .DS_Store
 .vscode/
 .idea/
+
+# DSH
+.dsh
