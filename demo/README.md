@@ -56,3 +56,39 @@ Every demo directory follows the same four-part README:
 **Optional bonuses**: `14` (vision), `15` (imitation learning).
 
 > Note: for every robotics demo in Phase B, prefer completing it with the "AI coding + skills" learned in Phase A — this closes the loop between "learning the tool" and "using the tool" while accelerating the robotics learning.
+
+---
+
+## Knowledge quick-reference (term - function - project implementation point)
+
+> Consolidates the concepts discussed across the earlier questions, in "term / function / where it lands in the project" three columns, for review and interview prep.
+
+| Term | Function | Project implementation point |
+|---|---|---|
+| ReAct loop | think-act-observe loop: model decides to call a tool → execute → feed result back → think again | demo/01 agent.py; demo/12-13 robot decision loop |
+| CoT / reasoning_content | the model's internal chain of thought, separate from the final answer (content) | printable in demo/01; collapsible "thinking" block in web GUI |
+| reasoning passback rule | tool turns pass back the scratch (continue reasoning), non-tool turns drop it (save tokens) | token optimization; demo/13 long sessions |
+| token accounting | usage fields: prompt/completion/cache_hit | demo/01's resp["usage"] |
+| token optimization | stable prefix for cache / auto compaction / progressive disclosure / terse tool results | demo/02 skill; demo/13 tool design |
+| token-meter | ring beside the send button (occupancy %) + stats line (turns/steps/latency/cache-hit) | web GUI composer area |
+| spatiotemporal compositionality | scope (space) + lifecycle (time) + anchor contract | demo/05; demo/13 hot-plugging |
+| Agent creation | dedicated persona + narrowed tool surface + skill | demo/13's robo preset |
+| Subagent delegation | fan out a self-contained subtask to an independent agent | perception/planning split, parallel ablations |
+| Goal loop | extend the current agent's autonomous progress on a long-term objective | auto-run a benchmark |
+| Plan mode | read-only exploration into a plan first, implement after approval | before changing robot code |
+| multi-model routing | multiple providers/models coexist and are selectable | cost tiering, fallback |
+| headless mode | run without UI and exit when done | demo/13 batch evaluation |
+| compaction | auto-summarize long history; truncate tool results (head+tail) | long sessions |
+| permission/approval/sandbox | the permission & approval boundary before tool execution | demo/13 reliability design |
+| retry policy | auto-retry failed requests at durable step boundaries | demo/13 reliability design |
+| MCP client | connect external tool servers via a standard protocol | alternative to plugins for reaching ROS2 (optional) |
+| client plugin/slots | add UI to the web GUI (client half) | robot status panel (optional) |
+
+### Easily-confused pairs
+
+| Pair | Difference |
+|---|---|
+| CoT vs ReAct | CoT reasons only inside the model, no external info; ReAct interleaves real actions so tool results correct the model |
+| Subagent vs Goal | subagent fans out to another agent; goal extends the current agent's autonomous duration |
+| dynamic plugin vs out-of-tree | dynamic = in-process temporary (gone on restart); out-of-tree = persistent, publishable (resume-grade) |
+| pressureTokens vs projectedTokens | pressure = the last request's prompt size; projected = what the next request is expected to cost (reflects compaction immediately) |

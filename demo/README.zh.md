@@ -56,3 +56,39 @@
 **可选加分**：`14`（视觉）、`15`（模仿学习）。
 
 > 注意：Phase B 的每个机器人 demo，都建议**用 Phase A 学到的「AI Coding + skill」来辅助完成**，这样既练了 DSH，又加速了机器人学习——把「学工具」和「用工具」闭环起来。
+
+---
+
+## 知识速查表（名词 - 功能 - 对应项目实现点）
+
+> 汇总前面各轮讨论涉及的概念, 按「名词 / 功能 / 对应项目实现点」三列整理, 供复习与面试速查.
+
+| 名词 | 功能 | 对应项目实现点 |
+|---|---|---|
+| ReAct 循环 | 思考-行动-观察循环: 模型决定调工具 → 执行 → 结果回填 → 再想 | demo/01 agent.py; demo/12-13 机器人决策循环 |
+| CoT / reasoning_content | 模型内部思维链, 与最终回答(content)分离 | demo/01 可打印; web GUI 折叠"思考"块 |
+| reasoning 回传规则 | 工具轮回传草稿(续接推理), 非工具轮丢弃(省 token) | token 优化; demo/13 长会话 |
+| token 统计 | usage 字段: prompt/completion/cache_hit | demo/01 的 resp["usage"] |
+| token 优化 | 稳定前缀吃缓存 / 自动压缩 / 渐进披露 / 结果精简 | demo/02 skill; demo/13 工具设计 |
+| token-meter | 输入框旁圆环(占用%) + 统计行(turns/steps/延迟/缓存命中) | web GUI 的 composer 区 |
+| 时空组合性 | 作用域(空间) + 生命周期(时间) + 锚点契约 | demo/05; demo/13 热插拔 |
+| Agent 创建 | 专用 persona + 收窄工具面 + skill | demo/13 的 robo preset |
+| Subagent 委托 | 横向分派自包含子任务给独立 agent | 感知/规划分工、并行消融 |
+| Goal 目标循环 | 纵向拉长当前 agent 自主推进长期目标 | 自动跑完评测 |
+| Plan 模式 | 先只读探索出计划, 批准后才动手 | 改机器人代码前 |
+| 多模型路由 | 多 provider/模型并存, 可选路 | 成本分层、备份 |
+| Headless 模式 | 无界面跑完即退 | demo/13 批量评测 |
+| 压缩(compaction) | 超长历史自动总结; 工具结果裁剪(头+尾) | 长会话 |
+| 权限/审批/沙箱 | 工具执行前的权限与审批边界 | demo/13 可靠性设计 |
+| Retry 策略 | 请求失败在持久步骤边界自动重试 | demo/13 可靠性设计 |
+| MCP 客户端 | 用标准协议接外部工具服务器 | plugin 之外接 ROS2 的另一种方式(可选) |
+| Client 插件/slots | 给 web GUI 加 UI(client 半) | 机械臂状态面板(可选) |
+
+### 易混淆概念区分
+
+| 对 | 区别 |
+|---|---|
+| CoT vs ReAct | CoT 只在模型内部推理, 外部信息进不来; ReAct 推理中穿插真实行动, 工具结果能回来修正判断 |
+| Subagent vs Goal | subagent 是"横向分派给别的 agent"; goal 是"纵向拉长当前 agent 的自主推进时长" |
+| 动态插件 vs 树外包 | 动态插件=进程内临时(重启即消失); 树外包=持久可发布(简历级) |
+| pressureTokens vs projectedTokens | pressure 是"上一个请求的提示词规模"; projected 是"下一个请求预计花多少"(压缩后立即反映) |
