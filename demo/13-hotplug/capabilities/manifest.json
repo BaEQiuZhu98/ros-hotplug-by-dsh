@@ -1,0 +1,16 @@
+{
+  "grasp": {
+    "name": "grasp",
+    "version": "1.0.0",
+    "description": "夹爪能力: 抓取动作",
+    "tool": "grasp_tool.js",
+    "sha256": "7d5cc2e2a5729f19bf8776bb970487f9c117de31d7fe457daf98c1cb35a4b76f"
+  },
+  "suction": {
+    "name": "suction",
+    "version": "1.0.0",
+    "description": "吸盘能力: 吸附动作",
+    "tool": "suction_tool.js",
+    "sha256": "d7251c8977c0659f52f2adf2f652ccc512ea33606f27cd93686e79e78c6d58d2"
+  }
+}
