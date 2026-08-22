@@ -1,0 +1,74 @@
+# robo agent preset 组合(阶段 2): 机器人任务 agent.
+#
+# 组成:
+#   1. persona: 「感知末端状态, 自适应选策略, 不做低层控制」(设计 §7.2).
+#   2. robo-observer(preset 自带文件, 相对路径): 订阅 tools/change + 注册 capability_status 工具(设计 §7.4 观测能力).
+#   3. 能力包行(树外包, 绝对路径): grasp/suction 末端能力, 挂到本 preset 的作用域(作用域遮蔽全局).
+#   4. skills/: 机器人能力自适应技能, 随 preset 走.
+#
+# 安装: 用 install.sh 复制本目录到 $DSH_HOME/.agent-presets/robo 并替换能力包路径占位.
+
+# ── persona ─────────────────────────────────────────────────────────────────
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: |-
+      你是机器人任务 agent(robo), 运行在 DeepSeek Harness, 工作目录 {{cwd}}. 你面向具身机器人, 负责感知与策略, 不做低层控制.
+
+      核心原则: 感知末端状态, 自适应选策略, 不做低层控制.
+      - 你不控制"自己具备什么末端": 末端执行器由人/平台/运维在运行时热插拔(挂载/卸载能力包), 这是外部事实, 不是你的决定.
+      - 每次执行前先感知: 调用 capability_status 工具. 判断"是否有末端能力"以 mounted 为准(你的工具表里有 grasp 工具 = 夹爪已挂载, 有 suction 工具 = 吸盘已挂载); physical.tools 是机器人物理末端状态(执行切换后的结果), 挂载初期可能还是 none, 调用能力工具后才会变成对应末端.
+      - 对同一句命令自适应选策略: 例如"抓小球" - mounted 有 grasp 就走夹取(调 grasp), mounted 有 suction 就走吸附(调 suction), 都没有则明确报告"当前没有末端执行器, 无法抓取", 绝不假装成功.
+      - 热插拔随时可能发生: 每次执行都重新感知, 不缓存旧的末端状态; 收到能力变化信号时更新你的感知.
+      - 不做低层控制: 你不直接发关节角、话题或碰 rosbridge, 只调用能力工具与状态查询工具; 低层控制属于 sim_bridge/cpp_control.
+      - 汇报时说明你感知到了什么、选择了什么策略、结果如何.
+
+# ── agent 指令压缩 ──────────────────────────────────────────────────────────
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── 通用工具(宿主服务, 只注册工具, 不需要 realm) ──────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs:
+      - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
+
+# ── 观测插件(设计 §7.4): 订阅 tools/change + capability_status 工具 ─────────
+
+- id: robo-observer
+  name: './src/observer.js'
+  config:
+    # 仓库根(找 bridge_client.py)与 venv python(有 roslibpy).
+    workdir: /root/my-project/ros-hotplug-by-dsh
+    python: /root/venvs/robo/bin/python3
+
+# ── 能力包行(树外包, 热插拔载体) ────────────────────────────────────────────
+#
+# name 是绝对路径(安装方用 install.sh 把 __CAPABILITY_BASE__ 替换为 profile
+# 的 node_modules 根). 能力包只注册工具, 不发布服务, 按组合规则不需要 isolate
+# realm; 挂在 preset 作用域 = 只对本会话的 agent 可见, 且遮蔽全局同名注册.
+# 卸载/替换能力 = 删除/改行后重启会话(或 install.sh 重新生成).
+
+- id: capability-grasp
+  name: '__CAPABILITY_BASE__/@ros-hotplug/dsh-plugin-grasp/src/host.js'
+  config:
+    workdir: /root/my-project/ros-hotplug-by-dsh
+    python: /root/venvs/robo/bin/python3
+
+- id: capability-suction
+  name: '__CAPABILITY_BASE__/@ros-hotplug/dsh-plugin-suction/src/host.js'
+  config:
+    workdir: /root/my-project/ros-hotplug-by-dsh
+    python: /root/venvs/robo/bin/python3

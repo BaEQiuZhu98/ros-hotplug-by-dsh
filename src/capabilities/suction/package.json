@@ -1,0 +1,15 @@
+{
+  "name": "@ros-hotplug/dsh-plugin-suction",
+  "version": "1.0.0",
+  "description": "ROS hot-plug capability: suction end-effector tool (drives sim_bridge via the bridge SDK)",
+  "type": "module",
+  "exports": {
+    ".": { "default": "./src/host.js" },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" }
+  },
+  "license": "MIT"
+}
