@@ -48,7 +48,7 @@ return {
         function submitInstruction(next) {
           const nextDir = next ? ('demo/' + next.dir) : 'demo/06-ros2-mujoco-env'
           const nextDemo = next ? next.dir : nextDir
-          const instruction = 'demo 目录已提交/确认。请继续编写下一章节: ' + nextDir + ' (' + nextDemo + ')。' + '先读 HANDOFF.md 的开工指示和 demo/README.zh.md 的路线, 再按三条约定实现该 demo 的中英双语 README 与代码: 中文注释+英文标点, 打印输出无 emoji; 完成后不要自行 git commit/push, 提交时机由用户决定(用户会再次点击本按钮)。'
+          const instruction = '请继续编写下一章节: ' + nextDir + ' (' + nextDemo + ')。' + '先读 HANDOFF.md 的开工指示和 demo/README.zh.md 的路线, 再按三条约定实现该 demo 的中英双语 README 与代码: 中文注释+英文标点, 打印输出无 emoji; 完成后不要自行 git commit/push, 用本面板的提交按钮独立提交各章节。'
           if (inputActions && typeof inputActions.setDraft === 'function' && typeof inputActions.submit === 'function') {
             inputActions.setDraft(instruction)
             inputActions.submit()
@@ -56,16 +56,9 @@ return {
           } else { setNote('inputActions 不可用') }
         }
         function startNext() {
+          // 只"启动写下一章", 不提交任何章节: 各章节状态独立, 提交由用户按章节点"提交"按钮完成.
           const next = chapters.filter(function (c) { return c.next })[0]
-          const dirty = chapters.filter(function (c) { return c.state === 'dirty' })
-          if (dirty.length) {
-            setBusy(true); setNote('先提交未提交的 demo ...')
-            host.call('commit-demo', {}).then((res) => {
-              setBusy(false)
-              if (res && res.ok) { if (Array.isArray(res.chapters)) setChapters(res.chapters); submitInstruction(next) }
-              else setNote('提交失败: ' + ((res && (res.error || res.output)) || ''))
-            }).catch((e) => { setBusy(false); setNote('提交失败: ' + String(e && e.message ? e.message : e)) })
-          } else { submitInstruction(next) }
+          submitInstruction(next)
         }
         function chip(c) {
           const icon = c.state === 'done' ? '✓' : (c.state === 'dirty' ? '⚠' : (c.next ? '▶' : '○'))
