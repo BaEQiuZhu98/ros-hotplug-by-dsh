@@ -2,7 +2,7 @@
 
 ## What you learn
 
-Reproduce your Huawei "AI-assisted engineering" playbook, on DSH:
+Reproduce the "AI-assisted engineering" playbook, on DSH:
 
 | Technique | What it is | In this demo |
 |---|---|---|
@@ -61,5 +61,5 @@ Then in the conversation say:
 
 ## How it relates to the final goal
 
-- This is the **reproducible version** of your Huawei "AI-assisted engineering": from now on, every demo's code uses this skill to keep the agent following conventions.
+- This is the **reproducible version** of "AI-assisted engineering": from now on, every demo's code uses this skill to keep the agent following conventions.
 - `demo/04` explains the other kind of capability besides skills — plugins (tools). Together they are DSH's two main ways to extend capability.

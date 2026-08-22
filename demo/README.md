@@ -13,7 +13,7 @@ Every demo directory follows the same four-part README:
 |---|---|---|---|---|
 | 00 | `00-dsh-quickstart` | DSH install, headless/web modes, first agent | an agent conversation | runtime base for all later demos |
 | 01 | `01-what-is-agent` | LLM basics, tool calling, ReAct loop, structured output | agent calls toy tools to finish a multi-step task, printing think→act→observe trace | the decision-brain principle underlying the DSH agent |
-| 02 | `02-ai-coding` | AI-assisted development with DSH: skills, structured docs, progressive disclosure, code review | a "project knowledge" skill + an AI-reviewed snippet | reproduces your Huawei "AI-assisted engineering" experience; used to accelerate all robotics demos |
+| 02 | `02-ai-coding` | AI-assisted development with DSH: skills, structured docs, progressive disclosure, code review | a "project knowledge" skill + an AI-reviewed snippet | reproduces the "AI-assisted engineering" experience; used to accelerate all robotics demos |
 | 03 | `03-dsh-concepts` | everything-is-a-plugin, Cordis, profile/preset/composition, tool/skill | a "capability = plugin row" diagram + a preset copy | builds the DSH mental model |
 | 04 | `04-dsh-plugin` | create a plugin, register tools (`ctx.tools`/`harness.registerTool`), host/client | a custom tool callable by the agent | satisfies the hard "create a plugin" requirement |
 | 05 | `05-dsh-spatiotemporal` | scope/layer/realm (space) + lifecycle/version (time) + anchor contract | demos: scope shadowing, isolate isolation, dispose reclamation | ★ the novelty core; the theoretical foundation of `13-hotplug` |

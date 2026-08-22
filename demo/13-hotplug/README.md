@@ -8,7 +8,7 @@ The previous 12 chapters built both halves: DSH (agent/plugin/spatiotemporal com
 
 This demo has **two complementary paths**:
 
-- **Path A (agent tool hot-plugging)**: make "gripper/suction" each a DSH capability tool, `cordis_run` to mount, `cordis_stop` to unmount, demonstrating the 7 reliability points (see `DESIGN.zh.md` §8).
+- **Path A (agent tool hot-plugging)**: make "gripper/suction" each a DSH capability tool, `cordis_run` to mount, `cordis_stop` to unmount, demonstrating the 7 reliability points (see `docs/design.zh.md` §8).
 - **Path B (web panel visualization closed loop)**: a web panel configures two arms' end-effectors (gripper/suction), sets the ball position, and picks an arm to touch the ball — the MuJoCo window follows live.
 
 ## File list

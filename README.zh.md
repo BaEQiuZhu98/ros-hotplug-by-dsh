@@ -24,7 +24,7 @@
 - 不主张「第一个做机器人热插拔」（ROS2 生命周期节点、AICA 等早已存在）。
 - 主张的是「**这套机制 × 这个场景 × 这个实现**」的结合与可复现验证。
 
-详细边界见 [`DESIGN.zh.md`](DESIGN.zh.md)。
+详细边界见 [`docs/design.zh.md`](docs/design.zh.md)。
 
 ---
 
@@ -33,8 +33,8 @@
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # 本文件（中 / 英）
-├── DESIGN.zh.md / DESIGN.md        # 技术说明：设计思路 + 新颖性 + 可靠性设计（中 / 英）
-├── docs/                           # 占位：novelty-claim / prior-art / 时空组合性 / disclosure-log
+├── docs/                           # design(设计) / novelty(现状与亮点) / glossary(名词概念) / 时空组合性 / disclosure-log
+├── plugins/                        # 动态 Cordis 插件归档（next-demo / sync-docs）
 └── demo/                           # 教学目录（见 demo/README.zh.md）
     ├── 00-dsh-quickstart/
     ├── 01-what-is-agent/
@@ -72,11 +72,11 @@ ros-hotplug-by-dsh/
 
 ---
 
-## 可靠性设计概览（体现华为经验）
+## 可靠性设计概览
 
-把华为项目里的可靠性经验，逐条映射到热插拔 demo（`demo/13-hotplug`）：
+把工程上的可靠性实践，逐条映射到热插拔 demo（`demo/13-hotplug`）：
 
-| 华为经验 | 本项目落点 |
+| 工程实践 | 本项目落点 |
 |---|---|
 | 零信任安全流水线（云端签名/加密 - 设备验签/解密） | 能力挂载前 manifest / 哈希校验，不合法拒绝挂载 |
 | 主备冗余 + 多版本共存 | 同一能力支持多版本共存 |
@@ -86,7 +86,7 @@ ros-hotplug-by-dsh/
 | 硬件差异屏蔽层（解耦） | 能力抽象层：同型末端执行器同名遮蔽、上层无感 |
 | 99.9% 高可用 / 资源不泄漏 | `isolate` realm 隔离 + Cordis dispose 精确回收 |
 
-详见 [`DESIGN.zh.md`](DESIGN.zh.md) 第 8 节。
+详见 [`docs/design.zh.md`](docs/design.zh.md) 第 8 节。
 
 ---
 

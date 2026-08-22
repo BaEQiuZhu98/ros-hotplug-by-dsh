@@ -1,6 +1,6 @@
 # demo/13 — 热插拔 7 个可靠性点走查（hotplug walkthrough）
 
-> 按顺序演示 `DESIGN.zh.md` §8 的 7 个可靠性点。所有「挂载/卸载/切版」都是对 DSH 动态插件的 `cordis_*` 操作；「能力」就是 `grasp` / `suction` 两个工具。
+> 按顺序演示 `docs/design.zh.md` §8 的 7 个可靠性点。所有「挂载/卸载/切版」都是对 DSH 动态插件的 `cordis_*` 操作；「能力」就是 `grasp` / `suction` 两个工具。
 
 先起好环境（rosbridge + `robot_server.py --view`，见 README）。
 
@@ -58,7 +58,7 @@ cordis_run(grasp, pkg-B, mode="update")   # 从 v1 灰度切到 v2
 
 ## 一句话收束
 
-这 7 条对应 `DESIGN.zh.md` §8「华为经验 → 项目落点」，每一条都能在一个 MuJoCo 手臂 + 两个末端执行器上**现场演示**，不是口头承诺。
+这 7 条对应 `docs/design.zh.md` §8「工程实践 → 项目落点」，每一条都能在一个 MuJoCo 手臂 + 两个末端执行器上**现场演示**，不是口头承诺。
 
 ---
 

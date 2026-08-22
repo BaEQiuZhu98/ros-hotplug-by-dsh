@@ -13,7 +13,7 @@
 |---|---|---|---|---|
 | 00 | `00-dsh-quickstart` | DSH 安装、headless/web 模式、跑通第一个 agent | 一段 agent 对话 | 之后所有 demo 的运行基座 |
 | 01 | `01-what-is-agent` | LLM 基础、tool calling、ReAct 循环、结构化输出 | agent 连续调用玩具工具完成多步任务，打印「思考→动作→观察」轨迹 | 理解决策大脑的原理，后面 DSH agent 的底层 |
-| 02 | `02-ai-coding` | 用 DSH 做 AI 辅助研发：skill、结构化文档、渐进式披露、代码审查 | 一个「项目知识 skill」+ 一段被 AI 审过的代码 | 复现你华为「AI 辅助研发」经验，且后面用它加速所有机器人 demo |
+| 02 | `02-ai-coding` | 用 DSH 做 AI 辅助研发：skill、结构化文档、渐进式披露、代码审查 | 一个「项目知识 skill」+ 一段被 AI 审过的代码 | 复现「AI 辅助研发」经验，且后面用它加速所有机器人 demo |
 | 03 | `03-dsh-concepts` | 一切皆插件、Cordis、profile/preset/composition、tool/skill | 一张「能力=插件行」的概念图 + 一次 preset 拷贝 | 建立 DSH 心智模型 |
 | 04 | `04-dsh-plugin` | 创建插件、注册工具（`ctx.tools`/`harness.registerTool`）、host/client | 一个能被 agent 调用的自定义工具 | 这是「创建 plugin」的硬性要求 |
 | 05 | `05-dsh-spatiotemporal` | scope/层/域（空间）+ 生命周期/版本（时间）+ 锚点契约 | 演示：作用域遮蔽、isolate 隔离、dispose 回收 | ★ 本项目新颖性所在，`13-hotplug` 的理论基石 |

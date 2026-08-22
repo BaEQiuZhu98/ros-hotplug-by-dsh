@@ -24,7 +24,7 @@
 - Does *not* claim to be first at robot hot-plugging (ROS2 lifecycle nodes, AICA, etc. already exist).
 - Claims the combination of **this mechanism × this scenario × this implementation**, reproducibly verified.
 
-See [`DESIGN.md`](DESIGN.md) for the precise boundary.
+See [`docs/design.md`](docs/design.md) for the precise boundary.
 
 ---
 
@@ -33,8 +33,8 @@ See [`DESIGN.md`](DESIGN.md) for the precise boundary.
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # this file (zh / en)
-├── DESIGN.zh.md / DESIGN.md        # technical note: design + novelty + reliability (zh / en)
-├── docs/                           # placeholder: novelty-claim / prior-art / spatiotemporal / disclosure-log
+├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log
+├── plugins/                        # archived dynamic Cordis plugins (next-demo / sync-docs)
 └── demo/                           # tutorial dirs (see demo/README.md)
     ├── 00-dsh-quickstart/
     ├── 01-what-is-agent/
@@ -72,11 +72,11 @@ See [`demo/README.md`](demo/README.md) for the per-demo breakdown. Order:
 
 ---
 
-## Reliability design overview (Huawei experience → project)
+## Reliability design overview
 
-Mapping Huawei reliability experience onto the hot-plug demo (`demo/13-hotplug`):
+Mapping reliability engineering practice onto the hot-plug demo (`demo/13-hotplug`):
 
-| Huawei experience | This project's counterpart |
+| Engineering practice | This project's counterpart |
 |---|---|
 | Zero-trust pipeline (cloud sign/encrypt - device verify/decrypt) | Verify manifest / hash before mounting a capability; reject invalid ones |
 | Active/standby redundancy + multi-version coexistence | One capability supports multiple coexisting versions |
@@ -86,7 +86,7 @@ Mapping Huawei reliability experience onto the hot-plug demo (`demo/13-hotplug`)
 | Hardware-difference shielding layer (decoupling) | Capability abstraction: same-type end-effectors shadow by name; upper layers unaware |
 | 99.9% availability / no leaks | `isolate` realm isolation + Cordis dispose for exact cleanup |
 
-See [`DESIGN.md`](DESIGN.md) section 8.
+See [`docs/design.md`](docs/design.md) section 8.
 
 ---
 

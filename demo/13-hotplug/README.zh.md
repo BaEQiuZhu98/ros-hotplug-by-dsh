@@ -8,7 +8,7 @@
 
 本 demo 有**两条互补的演示路径**：
 
-- **路径 A（agent 工具热插拔）**：把「夹爪/吸盘」各做成一个 DSH 能力工具，`cordis_run` 挂载、`cordis_stop` 卸载，演示 7 个可靠性点（对应 `DESIGN.zh.md` §8）。
+- **路径 A（agent 工具热插拔）**：把「夹爪/吸盘」各做成一个 DSH 能力工具，`cordis_run` 挂载、`cordis_stop` 卸载，演示 7 个可靠性点（对应 `docs/design.zh.md` §8）。
 - **路径 B（web 面板可视化闭环）**：一个 web 面板，配置双臂末端（夹爪/吸盘）、手动设置小球位置、选臂触碰小球，MuJoCo 窗口实时跟随。
 
 ## 文件清单

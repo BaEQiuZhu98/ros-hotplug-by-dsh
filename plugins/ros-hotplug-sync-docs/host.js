@@ -66,7 +66,7 @@ return {
         if (t.indexOf('---') >= 0) continue
         const cells = cellsOf(t)
         if (cells.length < 2) continue
-        if (cells[0] === '华为经验') continue
+        if (cells[0] === '项目经验') continue
         out.push({ title: cells[0], detail: cells.slice(1).join(' -> ') })
       }
       return out
