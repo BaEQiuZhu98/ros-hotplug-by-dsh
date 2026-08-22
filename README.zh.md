@@ -28,30 +28,22 @@
 
 ---
 
-## 仓库结构（当前阶段：只建 demo，暂不建 src / eval）
+## 仓库结构（当前阶段：demo 证据链 + src 源码工程；eval 待建）
 
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # 本文件（中 / 英）
 ├── docs/                           # design(设计) / novelty(现状与亮点) / glossary(名词概念) / 时空组合性 / disclosure-log
+├── src/                            # 源码工程(阶段 0~2 已落地, 见 src/README.zh.md)
+│   ├── capabilities/               #   能力仓库(repo) + 挂载服务(mount_service) + 规范 + 挂载守卫
+│   ├── presets/robo/               #   机器人任务 agent preset(persona + observer + skills)
+│   ├── ros2/                       #   sim_bridge(双臂仿真桥) + cpp_control(1kHz 控制)
+│   ├── bridge/                     #   桥接契约 v1.0 + 薄 SDK
+│   └── sim/                        #   MuJoCo 模型与场景
 ├── plugins/                        # 动态 Cordis 插件归档（next-demo / sync-docs）
 └── demo/                           # 教学目录（见 demo/README.zh.md）
-    ├── 00-dsh-quickstart/
-    ├── 01-what-is-agent/
-    ├── 02-ai-coding/
-    ├── 03-dsh-concepts/
-    ├── 04-dsh-plugin/
-    ├── 05-dsh-spatiotemporal/
-    ├── 06-ros2-mujoco-env/
-    ├── 07-rigid-transform/
-    ├── 08-kinematics/
-    ├── 09-trajectory-control/
-    ├── 10-ros2-basics/
-    ├── 11-cpp-control/
-    ├── 12-dsh-ros-bridge/
-    ├── 13-hotplug/                 # ★ 旗舰 demo：机器人能力热插拔（含可靠性设计）
-    ├── 14-vision/                  # 可选
-    └── 15-imitation/               # 可选
+    ├── 00-dsh-quickstart/ ... 15-imitation/
+    └── 13-hotplug/                 # ★ 旗舰 demo：机器人能力热插拔（含可靠性设计）
 ```
 
 ---
@@ -74,14 +66,14 @@ ros-hotplug-by-dsh/
 
 ## 可靠性设计概览
 
-把工程上的可靠性实践，逐条映射到热插拔 demo（`demo/13-hotplug`）：
+把工程上的可靠性实践，逐条映射到能力热插拔（`demo/13-hotplug` 教学演示 + `src/` 源码工程）：
 
 | 工程实践 | 本项目落点 |
 |---|---|
 | 零信任安全流水线（云端签名/加密 - 设备验签/解密） | 能力挂载前 manifest / 哈希校验，不合法拒绝挂载 |
-| 主备冗余 + 多版本共存 | 同一能力支持多版本共存 |
-| 灰度升级 + 业务零中断 | `update` 灰度切换到新版本，agent 无感 |
-| 异常秒级自动回滚 | 新能力激活失败自动回滚旧版本 |
+| 主备冗余 + 多版本共存 | 同一能力多版本并存（能力仓库版本目录） |
+| 升级切换 + 业务零中断 | 卸载旧能力 + 挂载新能力，agent 无感（灰度不做，用户决策） |
+| 异常秒级自动回滚 | 新能力激活失败则旧句柄保留，旧能力仍在 |
 | 发布/订阅事件通知 | 能力增删广播事件，agent 通过订阅感知 |
 | 硬件差异屏蔽层（解耦） | 能力抽象层：同型末端执行器同名遮蔽、上层无感 |
 | 99.9% 高可用 / 资源不泄漏 | `isolate` realm 隔离 + Cordis dispose 精确回收 |

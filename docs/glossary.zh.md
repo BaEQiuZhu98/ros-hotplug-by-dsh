@@ -19,9 +19,12 @@
 | apply / effect / dispose | Cordis 生命周期：注册 → 挂副作用 → 精确撤销 | 卸载能力 = dispose 精确回收 |
 | Fiber | 插件副作用的挂载点，随插件生灭 | `ctx.on`/`ctx.effect` 都挂在当前 Fiber |
 | 锚点契约 | 注册的上下文同时决定可见性与生命周期 | 杜绝「看得见却已死 / 活着却看不见」 |
-| 动态插件 | 进程内临时插件（`cordis_define/run/update/stop/undefine`），重启消失 | demo 里的能力工具、工作流面板 |
-| plugin / package / run | 版本时序：插件实例 / 不可变代码版本 / 一次激活尝试 | 多版本共存、灰度、回滚 |
-| 树外包（out-of-tree） | 持久、可发布的 npm 插件包（`dsh plugin add` 安装） | 源码阶段的正式能力交付件 |
+| 动态插件 | 进程内临时插件（`cordis_define/run/update/stop/undefine`），重启消失；沙箱 ctx 刻意隐藏框架内部（如 `ctx.plugin`） | demo 里的能力工具、工作流面板、临时探针 |
+| plugin / package / run | 版本时序：插件实例 / 不可变代码版本 / 一次激活尝试 | 多版本共存、回滚 |
+| 树外包（out-of-tree） | 持久、可发布的 npm 插件包（`dsh plugin add` 安装）；本项目里只作能力目录的**发布外壳** | 公开分发用，解包进能力仓库后走挂载服务 |
+| 能力仓库目录 | 能力的一等交付件：`repo/<能力>/<版本>/{host.js, manifest.json}`，零依赖 | `src/capabilities/repo/` |
+| 能力挂载服务 | host 常驻插件：mount = 校验 manifest + `ctx.plugin` 运行时挂载；unmount = `fiber.dispose()`；唯一写入口 = web 面板 RPC，**不注册 agent 工具** | `src/capabilities/mount_service/` |
+| 机器作用域 | 挂载服务挂载能力的作用域（机器本体层）：所有 agent 向下继承可见 | 热插拔的「空间锚点」 |
 | profile / preset | profile=应用层启动配置；preset=agent 层组成配置（目录） | `robo` preset 是「开箱即用的机器人 agent」 |
 | 工具（tool） | agent 可调用的能力，契约 = name/description/parameters/output/execute | 能力工具 grasp/suction/detect |
 | host / client 半部 | 插件在进程内(Node)与浏览器里的两半 | web 面板插件的两半部 |
@@ -35,14 +38,14 @@
 | 名词 | 一句话含义 | 对应项目实现点 |
 |---|---|---|
 | 能力（capability）/ 能力工具 | 一个末端执行器/传感器/技能，封装成一个 DSH 工具 | grasp / suction / detect |
-| 挂载 / 卸载 | 运行时注册/撤销一个能力插件 | `cordis_run` / `cordis_stop` |
+| 挂载 / 卸载 | 运行时注册/撤销一个能力插件（挂载服务：`ctx.plugin` / `fiber.dispose`，不重启） | `mount_service` 的 mount/unmount |
 | manifest | 能力元数据 + 代码哈希 | 挂载前校验用 |
 | 挂载守卫（mount_guard） | 挂载前验哈希的闸（零信任） | `src/capabilities/mount_guard.py` |
 | 零信任 / 哈希校验 | 每次挂载都假设不可信，先验身再上机 | 篡改 manifest → 拒绝挂载 |
 | 签名（扩展） | 证明「确实出自某人」，= 对哈希加密 | 「云端签名/加密 → 设备验签/解密」的加分项 |
-| 多版本共存（主备） | 同一能力多个不可变 package 并存 | v1/v2/v3 不覆盖 |
-| 灰度升级 | `update` 平滑切版，工具名不变，agent 无感 | v1→v2 切版 |
-| 回滚 | 激活失败/出问题后回到旧版 | 注入坏版本 → `run` 回滚 |
+| 多版本共存（主备） | 同一能力多个版本目录并存、互不覆盖 | repo 下 v1/v2/v3 目录 |
+| 换版切换 | 卸载旧能力 + 挂载新能力，工具名不变，agent 无感 | 挂载服务 unmount + mount |
+| 回滚 | 新版本激活失败则旧句柄保留，旧能力仍可用 | 注入坏版本 → 旧能力照常 |
 | 事件通知 | 能力增删广播，agent 订阅感知 | 观测 agent + `tools/change` |
 | 同名遮蔽 / 硬件差异屏蔽 | 同型能力同名、就近遮蔽、不串台 | 两个夹爪实例 |
 | 无泄漏 | isolate + dispose 精确回收 | 卸载后无残留 |
@@ -74,14 +77,15 @@
 
 | 名词 | 一句话含义 | 对应项目实现点 |
 |---|---|---|
-| L0~L6 交付件 | 仓库/能力包/preset/机器人包/桥契约/评测/文档 六层 | 设计文档 §10 |
-| 能力包（树外包） | 一个末端/感知 = 一个可安装 npm 包（工具+manifest+版本） | `src/capabilities/*` |
-| agent preset（robo） | 开箱即用的机器人 agent 配置目录（组合+persona+skill） | `src/presets/robo` |
+| L0~L6 交付件 | 仓库/能力/preset/机器人包/桥契约/评测/文档 六层 | 设计文档 §10 |
+| 能力（仓库目录） | 一个末端/感知 = 一个能力目录（host.js+manifest+版本）；npm 包是可选发布外壳 | `src/capabilities/repo/*` |
+| 能力挂载服务 | host 常驻插件：校验 manifest + 运行时挂/卸能力，唯一写入口（web 面板） | `src/capabilities/mount_service` |
+| agent preset（robo） | 开箱即用的机器人 agent 配置目录（persona+observer+skills，**无能力行**） | `src/presets/robo` |
 | 仿真桥（sim_bridge） | 机器人侧 Python 包：订阅桥指令、驱动 MuJoCo、可视化、反馈 | `src/ros2/sim_bridge` |
 | 控制节点（cpp_control） | 机器人侧 C++ 包：1kHz 控制环/PID/延迟测量 | `src/ros2/cpp_control` |
 | 桥接契约（bridge contract） | 话题/消息 schema 的版本化文档 | `src/bridge/contract.md` |
 | SDK（薄封装） | 能力开发者/插件 host 共用的 Python 函数式接口（校验内置） | `src/bridge/bridge_client.py` |
-| 能力开发规范 | 加新能力 = 按模板写包 + 填 manifest，不改框架 | `src/capabilities/capability-spec.md` |
+| 能力开发规范 | 加新能力 = 按模板写能力目录 + 填 manifest，挂载走挂载服务，不改框架 | `src/capabilities/capability-spec.md` |
 | 评测四维度 | robot / agent / hotplug / native_swap | `eval/` |
 | 公开基线 | 1kHz、IK 求解器量级、<1mm 轨迹等可查证指标 | 设计文档 §11.2 |
 | agent 感知与自适应 | agent 不控制末端，而是感知末端状态、对同一命令自适应选策略 | 设计文档 §7.2 |

@@ -1,88 +1,59 @@
-# src/capabilities/capability-spec.md — 能力包开发规范 v1
+# src/capabilities/capability-spec.md — 能力开发规范 v2
 
-> 本规范定义「能力包」(树外包)的标准形态. 一个能力包 = 一个 npm 包, 是可持久分发、
-> 带版本与安全语义的热插拔载体; 热插拔机制本身由 DSH 提供(见 `docs/design.zh.md` §7.5).
-> 读者: 能力开发者(写新末端/感知能力)与挂载方(人/平台/运维).
+> 本规范定义「能力」的标准形态与挂载流程. 一个能力 = 一个末端执行器/传感器/技能,
+> 封装成一个 DSH 工具; 热插拔本体 = 能力挂载服务(运行时挂载/卸载, 不重启).
+> 读者: 能力开发者(写新末端/感知能力)与挂载方(人/平台/运维, 经 web 面板操作).
 
 ## 1. 定位与原则
 
-- **能力 = 工具 + manifest + 版本**: 包注册一个 DSH 工具, 带 manifest 供挂载前校验, 版本号 = npm version.
-- **校验前置**: 每次挂载前用 `mount_guard.py` 对代码文件重算 SHA256 与 manifest 比对(零信任).
-- **不改 DSH**: 包只声明 `dsh` 字段与 patch 行, 不修改任何 DSH 源码.
-- **灰度不做(用户决策 2026-08)**: 不做灰度切流; 保留版本升级与回滚(回滚 = 重装旧版本 + 重启进程, 见 §6).
-- **SDK 保持薄(用户决策 2026-08)**: 能力代码只调 `src/bridge/bridge_client.py` 的 CLI, 不直接碰 rosbridge.
+- **能力 = 工具 + manifest + 版本**: host.js 注册一个 DSH 工具; manifest 供挂载前校验; 版本目录供换版/回滚.
+- **一等交付件 = 能力仓库目录**: `repo/<capability>/<version>/{host.js, manifest.json}`, 零依赖.
+  npm 树外包只是可选**发布外壳**(pack.sh 打包 tarball 分发, 解包进仓库后走同一挂载服务).
+- **唯一写者 = 人**: 挂载/卸载/换版只经 web 面板 RPC 调挂载服务; agent 的工具表里没有挂/卸工具,
+  物理上无法修改末端装配(读/写路径分离, 见 design.zh.md §7.6).
+- **热插拔 = DSH 的运行时挂载机制**: 挂载服务 `ctx.plugin(...)` / `fiber.dispose()`(即动态插件
+  `cordis_run` 的底层同款机制), 插入即见、拔出即回收, 全程不重启.
+- **校验前置(零信任)**: 每次挂载前 mount_guard 对 host.js 重算 SHA256 与 manifest 比对.
+- **不改 DSH 源码**: 只复用其公开机制.
 
-## 2. 包目录模板(以 grasp 为例)
+## 2. 能力目录模板(以 grasp 为例)
 
 ```
-grasp/
-├── package.json          # npm 元数据 + dsh.bundle.patch 声明
-├── cordis.patch.yml      # 组合补丁: 一行 entry, 把本包挂进组合树
-├── src/
-│   └── host.js           # ESM host 入口: 注册能力工具
-├── manifest.json         # 能力元数据 + 代码 sha256(挂载校验)
-└── README.zh.md          # 怎么打包/安装/验证/升级回滚
+repo/grasp/1.0.0/
+├── host.js            # ESM 能力插件(零依赖): 注册能力工具
+└── manifest.json      # 能力元数据 + host.js 的 sha256(挂载校验)
 ```
 
-## 3. package.json 必需字段
+## 3. host.js 契约
 
-```json
-{
-  "name": "@ros-hotplug/dsh-plugin-grasp",
-  "version": "1.0.0",
-  "type": "module",
-  "exports": {
-    ".": { "default": "./src/host.js" },
-    "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
-  },
-  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+- **零依赖**: 不 import 任何包(仓库目录在 node_modules 解析链之外, 且自包含利于分发),
+  只用注入的服务与手写 Tool 契约.
+- ESM 命名导出 `{ apply, inject, name }`(Cordis Plugin):
+
+```js
+export const name = 'capability-grasp'
+export const inject = ['tools', 'shell']
+export function apply(ctx, config = {}) {
+  // config 来自挂载服务的仓库配置(workdir/python 等)
+  const unregister = ctx.tools.register({
+    name: 'grasp',
+    description: '把机械臂末端执行器切换到"夹爪", 并让该臂去触碰小球.',
+    parameters: { type: 'object', properties: { arm: { type: 'string', enum: ['A', 'B'] } }, required: [] },
+    output: { schema: { type: 'string' }, render(_args, value) { return [{ type: 'text', text: value }] } },
+    async execute(args) {
+      // 只调 bridge_client.py CLI(薄 SDK), 不直接碰 rosbridge
+      return 'grasp 已触发'
+    },
+  })
+  return () => { unregister() }   // dispose 精确回收
 }
 ```
 
-- `dsh.bundle.patch`: 声明本包是一个 bundle 层(指向 cordis.patch.yml), 这是 `dsh plugin add` 之后
-  包名被自动写进 profile `dsh.profile.bundles` 的依据(DSH 的 reconcilePlugins 机制).
-- 无 `dependencies`: host.js 里裸导入 `@deepseek-ai/dsh-tools`, 由 DSH 的
-  `$DSH_HOME/profiles/node_modules` 符号链接回退解析(DSH 内置机制, 不要声明依赖去触发 registry 下载).
+- Tool 契约 = DSH 标准(`{name, description, parameters(JSON Schema), output{schema,render}, execute}`), 不造新协议.
+- 执行链: execute → `ctx.shell` 调 `bridge_client.py <method> <args...>` → rosbridge → sim_bridge.
+- 副作用全部随插件 dispose 回收(apply 返回 disposer).
 
-## 4. cordis.patch.yml 行格式
-
-```yaml
-- insert:
-  - id: capability-grasp        # 组合树内稳定 id
-    name: '@ros-hotplug/dsh-plugin-grasp'   # 模块 specifier(包名 -> exports["."])
-    config:                     # 传给插件 apply 的配置
-      workdir: /path/to/repo    # bridge_client.py 所在仓库根
-      python: /root/venvs/robo/bin/python3
-```
-
-- 行字段: `id`(稳定 id) / `name`(模块 specifier) / `config`(插件配置) / `disabled` / `inject`(可选).
-- 卸载 = 从 patch 行删除或 `disabled: true` 后重启; 挂载 = 加行 + 重启(或首次安装).
-- 同名隔离(两个 grasp 实例)与更细的作用域挂载属阶段 2 的 isolate realm 设计, 行格式不变.
-
-## 5. host.js 契约
-
-- ESM 命名导出 `{ apply, inject, name }`(Cordis Plugin), 官方形态:
-  ```js
-  import { defineTool } from '@deepseek-ai/dsh-tools'
-  export const name = 'capability-grasp'
-  export const inject = ['tools', 'shell']
-  export function apply(ctx, config) {
-    ctx.tools.register(defineTool({
-      name: 'grasp',
-      description: '...',
-      parameters: { ... },        // JSON Schema
-      output: { schema: { type: 'string' }, render(_args, value) { return [{ type: 'text', text: value }] } },
-      async execute(args) { ... } // 只调 bridge_client.py CLI(薄 SDK), 不 import 任何 ROS 包
-    }))
-  }
-  ```
-- Tool 契约 = DSH 标准 Tool(`{name, description, parameters, output{schema,render}, execute}`), 用 DSH 现成接口, 不造新协议.
-- execute 内: `ctx.shell.resolve({command, workdir, timeoutMs})` + `ctx.shell.run(spec)`,
-  命令形态 `python bridge_client.py <method> <args...>`, 解析 JSON 输出, 返回人类可读文本.
-- 所有副作用(工具注册等)必须随插件 dispose 回收: `ctx.tools.register(...)` 返回 disposer, 用 `ctx.on('dispose', ...)` 或返回给 Cordis 管理.
-
-## 6. manifest.json 字段与挂载校验
+## 4. manifest.json 字段与挂载校验
 
 ```json
 {
@@ -90,59 +61,63 @@ grasp/
     "name": "grasp",
     "version": "1.0.0",
     "description": "夹爪能力: 把指定臂末端切到夹爪并触碰小球",
-    "tool": "src/host.js",
-    "sha256": "<sha256 of src/host.js>"
+    "tool": "host.js",
+    "sha256": "<sha256 of host.js>"
   }
 }
 ```
 
-- 键 = 能力名, 顶层是能力字典(与 demo/13 兼容, 一个 manifest 可登记多个能力).
-- `sha256` 必须真实计算: `sha256sum src/host.js`.
-- 挂载前校验(零信任, 对应 design §8 可靠性点 1):
-  `python3 src/capabilities/mount_guard.py <包>/manifest.json grasp <包>/src/host.js`
-  退出码 0 = 放行, 1 = 拒绝. 校验通过后才允许 `dsh plugin add`.
-- 注意: DSH 本身无 sha256/manifest 校验(只有 sha1 缓存 rev), 本步是应用层安全边界.
+- 顶层是能力字典(一个 manifest 可登记多个能力, 与 demo/13 兼容).
+- `sha256` 必须真实计算: `sha256sum host.js`.
+- 挂载前校验: 挂载服务 mount 的第一步 = 调 `mount_guard.py manifest.json <cap> host.js`,
+  不通过直接拒绝(DSH 自身无 sha256/manifest 校验, 本步是应用层安全边界).
 
-## 7. 版本策略: 升级与回滚(灰度不做)
+## 5. 能力挂载服务(mount_service, host 常驻插件)
 
-- 版本 = package.json 的 `version`(npm 语义).
-- **升级**: 发布新版本(本地 tarball) → `dsh plugin --profile <name> add <新 tarball>` → 重启进程.
-- **回滚**: `dsh plugin --profile <name> add <旧 tarball>`(pnpm 语义) → 重启进程. DSH 树外包模型
-  无进程内版本指针, 回滚粒度 = 进程重启(分钟级).
-- **秒级回滚/灰度属另一套机制**: 进程内动态插件(plugin/package/run 时序, `currentPackageId` 指针,
-  `run`/`update` 切换)才是秒级回滚; 树外包是"持久分发"载体, 两者分工不同(见 HANDOFF §8).
-- 同一能力多版本共存: npm 单一解析, 一个 profile 内同名包只有一个版本; 需要共存时用动态插件模型.
+- **形态**: 组合挂载的真实插件(host 常驻行), **不是动态沙箱插件**——动态插件的沙箱 ctx
+  刻意隐藏 `ctx.plugin`/`fiber` 等框架内部(实测报错: sandbox ctx does not expose "plugin").
+- **API**(Cordis Service 或私有 RPC, 供 web 面板调用; **不注册 agent 工具**):
 
-## 8. 本地发布流程(公开 npm 前自验证)
-
-```bash
-# 打包(在能力包目录): 产出 <name>-<version>.tgz
-bash ../../pack.sh .        # 或 npm pack
-
-# 安装到目标 profile(本地 tarball, 不碰 registry)
-dsh plugin --profile <name> add /path/to/<name>-<version>.tgz
-
-# 查看组合树是否挂上本包
-dsh --profile <name> --dump-config
+```text
+mount(cap, version):  1) mount_guard 校验 sha256  2) 动态 import host.js
+                      3) ctx.plugin(plugin, config) 挂到机器作用域(异步安装, 等待就绪)
+                      4) 记录句柄 {id, cap, version, fiber}  5) 返回 {ok, id} / {ok:false, error}
+unmount(id):          await fiber.dispose()(异步回收) -> 返回 {ok}
+list():               仓库能力清单 + 当前已挂载清单
 ```
 
-验证线: `dsh plugin add` → 组合树出现能力行 → 进程重启后工具表出现能力工具 → 调用工具经 SDK 驱动 sim_bridge.
+- **换版/回滚**: 换版 = unmount(旧) + mount(新); 新版本挂载失败则旧句柄保留(旧能力仍在).
+- **同名隔离**: 多实例(两个夹爪)挂载时用 isolate realm 包住子树(nearest-wins/作用域遮蔽).
+- **事件**: 挂/卸触发 `tools/change` 广播, agent 的观测插件订阅感知(挂载服务不负责通知, 事件是注册的天然副作用).
 
-## 9. client 半部(预留, 暂不要求)
+## 6. 版本策略: 换版与回滚(灰度不做)
 
-- 需要浏览器面板的能力才加 `dsh.client`(platform/inject/immediately)与 `exports["./client"]`.
-- 构建工具: `tsdown`(与 DSH 生态一致), client 半部必须产出
-  `window.__ModuleLoader__.load({id, factory})` 形态的经典脚本(factory = 惰性 CJS 闭包).
-- tsdown 具体配置未随 npm 发布, 动工前回源仓库 github.com/deepseek-ai/deepseek-harness
-  读 `packages/client/*` 的 tsdown 配置照抄(见 `.dsh/research/tree-package-build-chain.zh.md` §8).
-- 本仓库阶段 1 的能力包只有 host 半部(零构建); 阶段 2 的观测面板按本节补 client 半部.
+- 版本 = 能力目录名(语义化版本目录 `1.0.0`/`1.1.0`).
+- 换版: 人在面板选新版本 → unmount(旧) + mount(新), 工具名不变, agent 无感.
+- 回滚: 新版本激活失败(挂载返回 error)→ 旧句柄保留, 旧能力照常可用; 也可显式换回旧版本.
+- 灰度不做(用户决策 2026-08); 秒级回滚是挂载服务句柄模型的原生能力.
 
-## 10. 与动态插件的区别(防混淆)
+## 7. 分发流程(npm 发布外壳, 可选)
 
-| | 树外包(本规范) | 动态插件(demo 13) |
+```bash
+# 打包: 把 repo/<cap>/<version> 打成 npm tarball(公开分发用)
+bash src/capabilities/pack.sh <cap>
+
+# 装机: tarball 解包进目标机器的能力仓库(不是 dsh plugin add; 安装 != 挂载)
+# 挂载: 全部经挂载服务(web 面板), 运行时生效
+```
+
+- 开发/本地验证直接写仓库目录, 无打包环节.
+- 树外包与动态插件的分工: 仓库目录 = 持久交付载体; npm = 发布外壳; 动态插件 = 调试/一次性演示.
+
+## 8. 与动态插件的区别(防混淆)
+
+| | 能力仓库 + 挂载服务(本规范) | 动态插件(demo 13) |
 |---|---|---|
-| 形态 | npm 包, 持久分发 | 进程内临时, 会话级 |
-| 安装 | `dsh plugin add` + 重启 | `cordis_define` + `cordis_run` |
-| 版本 | npm version | package/run 不可变版本 + 指针 |
-| 回滚 | 重装旧版本 + 重启(分钟级) | `run`(current) 秒级回滚 |
-| 用途 | 正式交付载体 | 演示/开发/快速试错 |
+| 形态 | 目录 + host 常驻插件 | 进程内临时, 会话级 |
+| 挂载 | 面板 RPC → ctx.plugin(机器作用域, 全局可见) | cordis_define + cordis_run(会话作用域) |
+| 写权限 | 只有人(面板) | 只有 agent 会话 |
+| 卸载 | await fiber.dispose() | cordis_stop |
+| 版本/回滚 | 版本目录 + 句柄 | package/run 指针 |
+| 沙箱 | 无(真实插件环境) | 有(禁框架内部, 不能承载挂载服务) |
+| 用途 | 正式交付 + 热插拔本体 | 演示/开发/快速试错 |

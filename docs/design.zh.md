@@ -88,6 +88,7 @@ MuJoCo 仿真（双臂 + 多末端执行器 + 场景） / 真机（换 hardware_
 ### 7.2 agent 的角色：感知与自适应（重要修正）
 
 - **agent 不控制「自己具备什么末端」**。末端的挂载/更换由**人 / 平台 / 运维**完成（外部事件）。
+- **agent 也没有挂载权限**：挂载/卸载的唯一写入口是 web 面板（人点击）→ 能力挂载服务；agent 的工具表里根本没有挂/卸工具，物理上无法修改末端装配（写路径/读路径分离，见 §7.6）。
 - agent 的角色是：
   1. **感知**：当前有哪些末端能力可用（工具表 / 能力状态查询 / `tools/change` 事件）；
   2. **推理**：对**同一个语言命令**（如「抓小球」，不含「用夹爪」这种限定），根据当前末端状态**自适应选择策略与计算方式**——有夹爪走夹取策略、有吸盘走吸附策略、没有末端则报告「当前没有末端执行器，无法抓取」；
@@ -115,12 +116,24 @@ MuJoCo 仿真（双臂 + 多末端执行器 + 场景） / 真机（换 hardware_
 
 | 操作 | 机制 | 效果 |
 |---|---|---|
-| 挂载能力 | 在 robot 作用域注册插件工具 | 立刻对 agent 可见可用 |
-| 卸载能力 | dispose 该插件 | 精确回收其订阅/连接，agent 无感 |
-| 替换能力 | 多版本共存 + `update` 灰度切换 | 新旧并存、平滑切换 |
-| 同名隔离 | `isolate` realm | 两个夹爪/吸盘实例互不串台 |
-| 失败回滚 | `run`(当前) vs `update`(目标) | 激活失败自动回滚旧版本 |
-| 变化感知 | 事件广播 + agent 订阅 | agent 自动感知能力增删 |
+| 挂载能力 | 挂载服务校验 manifest 后在**机器作用域**运行时注册插件（`ctx.plugin`） | 立刻对 agent 可见可用，**不重启** |
+| 卸载能力 | 挂载服务 `fiber.dispose()`（异步，精确回收） | 精确回收其订阅/连接，agent 无感 |
+| 替换能力 | 卸载旧能力 + 挂载新能力（能力仓库按版本目录并存） | 切换期间 agent 无感 |
+| 同名隔离 | isolate realm / 作用域遮蔽（nearest-wins） | 两个夹爪/吸盘实例互不串台 |
+| 失败回滚 | 挂载服务保留旧句柄，新版本激活失败则旧能力仍在 | 旧能力不受影响 |
+| 变化感知 | 事件广播（tools/change）+ agent 订阅 | agent 自动感知能力增删 |
+
+### 7.6 写路径与读路径分离（唯一写者 = 人）
+
+```
+写路径(唯一):  人 ──点击──► web 面板 ──RPC──► 能力挂载服务 ──► 挂载/卸载/换版本
+读路径(agent): 任务 agent ──► 工具表 + capability_status(只读感知, 自适应选策略)
+               观测 agent ──► tools/change 事件(只读订阅, 汇报能力集)
+```
+
+- 能力挂载服务是**组合挂载的真实插件**（host 常驻行），不是动态沙箱插件：动态插件的沙箱 ctx 刻意隐藏 `plugin` 等框架内部，而挂载服务需要 `ctx.plugin`/`fiber.dispose` 这两条运行时挂/卸原语（即动态插件 `cordis_run` 的底层同款机制，已源码核实）。
+- 挂载与卸载是异步动作：`ctx.plugin` 返回后 apply 尚未跑完，`dispose` 返回后回收尚未完成；挂载服务要返回「就绪」信号，卸载要 await dispose 完成。
+- agent 拿不到挂/卸工具 = 作用域天然隔离，不靠 persona 规劝。
 
 ---
 
@@ -130,23 +143,23 @@ MuJoCo 仿真（双臂 + 多末端执行器 + 场景） / 真机（换 hardware_
 |---|---|---|
 | 零信任安全流水线 | 能力挂载前 manifest / 哈希校验，不合法拒绝 | 传入篡改 manifest → 拒绝挂载 |
 | 主备冗余 + 多版本共存 | 同一能力多版本共存 | 同时注册 v1/v2 不冲突 |
-| 灰度升级 + 业务零中断 | `update` 灰度切换，agent 无感 | 切换期间任务不中断 |
-| 异常秒级自动回滚 | 新能力激活失败回滚旧版 | 注入故障 → 自动回滚 |
+| 灰度升级 + 业务零中断 | 卸载旧能力 + 挂载新能力，agent 无感 | 切换期间任务不中断 |
+| 异常秒级自动回滚 | 新能力激活失败则旧句柄保留，旧能力仍在 | 注入故障 → 旧能力照常可用 |
 | 发布/订阅事件通知 | 能力增删广播事件，agent 订阅感知 | 挂载/卸载时事件被收到 |
 | 硬件差异屏蔽层 | 能力抽象层：同型末端同名遮蔽 | 两末端执行器同名遮蔽正确 |
 | 高可用 / 资源不泄漏 | isolate 隔离 + dispose 精确回收 | 卸载后无残留连接/状态 |
 
 ### 8.1 各可靠性点的机制与落地
 
-| # | 可靠性点 | DSH 机制 | demo 13 怎么证明 |
+| # | 可靠性点 | DSH 机制 | 怎么证明 |
 |---|---|---|---|
-| 1 | 零信任/哈希校验 | 挂载守卫（应用层）+ 作用域注册 | 篡改 manifest 哈希 → `mount_guard` 拒绝挂载 |
-| 2 | 多版本共存 | package 不可变、多版本并存 | v1/v2/v3 三个 package 并存、互不覆盖 |
-| 3 | 灰度升级 | `update` 切版 | 切到 v2 期间工具名不变，agent 无感 |
-| 4 | 秒级回滚 | `run`(当前) vs `update`(目标) | 注入坏 v3 → 失败 → 旧版仍在跑 |
+| 1 | 零信任/哈希校验 | 挂载守卫（挂载服务内）+ 机器作用域注册 | 篡改 manifest 哈希 → `mount_guard` 拒绝挂载 |
+| 2 | 多版本共存 | 能力仓库版本目录并存 + 不可变包 | v1/v2/v3 并存、互不覆盖 |
+| 3 | 换版切换 | 卸载旧能力 + 挂载新能力 | 切换期间工具名不变，agent 无感 |
+| 4 | 失败回滚 | 挂载服务保留旧句柄，新版本激活失败旧能力仍在 | 注入坏版本 → 挂载失败 → 旧能力照常可用 |
 | 5 | 事件通知 | `tools/change` 等事件广播 + 订阅 | 挂/卸时监听器收到事件 |
-| 6 | 同名遮蔽 | nearest-wins + isolate realm | 两同型能力同名注册不串台（组合层） |
-| 7 | 不泄漏 | isolate + Cordis dispose | 卸载后确认无残留 RPC/订阅/状态 |
+| 6 | 同名遮蔽 | nearest-wins + isolate realm | 两同型能力同名注册不串台 |
+| 7 | 不泄漏 | isolate + Cordis dispose | 卸载后确认无残留订阅/状态 |
 
 > **零信任/哈希校验的威胁模型**：能力可能来自**外部分发**或 **agent 现场生成**（大模型会幻觉、可被注入诱导），也可能在**存储/流转中被篡改**。因此「每次挂载都假设不可信，先验身再上机」——哈希证明「没被改过」，签名（可选加分项）证明「确实出自某人」，即「云端签名/加密 → 设备验签/解密」的零信任流水线。demo 13 先做哈希闭环，签名留作扩展。
 
@@ -177,14 +190,14 @@ MuJoCo 仿真（双臂 + 多末端执行器 + 场景） / 真机（换 hardware_
 ```
 ros-hotplug-by-dsh/
 ├── src/
-│   ├── capabilities/              # ★ 热插拔能力 + 末端工具配置
-│   │   ├── capability-spec.md     #   能力开发规范(模板 + 契约)
+│   ├── capabilities/              # ★ 能力仓库 + 挂载服务 + 规范
+│   │   ├── capability-spec.md     #   能力开发规范(模板 + manifest + 挂载流程)
 │   │   ├── mount_guard.py         #   挂载前哈希校验(零信任)
-│   │   ├── grasp/                 #   末端能力: 夹爪(树外包包)
-│   │   ├── suction/               #   末端能力: 吸盘
-│   │   └── detect/                #   感知能力(demo 14 用)
+│   │   ├── mount_service/         #   能力挂载服务(host 常驻插件: 校验 + 运行时挂/卸; 唯一写入口)
+│   │   ├── repo/                  #   能力仓库目录(一等交付件): grasp/1.0.0/{host.js, manifest.json} ...
+│   │   └── pack.sh                #   可选发布外壳: 仓库目录打包成 npm tarball(公开分发用)
 │   ├── presets/                   #   运行载体
-│   │   └── robo/                  #   agent.cordis.yml(isolate 组合) + persona + skills
+│   │   └── robo/                  #   agent.cordis.yml(persona + observer + skills, 无能力行) + 技能
 │   ├── ros2/                      #   机器人侧(colcon 包)
 │   │   ├── cpp_control/           #   C++ 高频控制节点(1kHz, PID)
 │   │   └── sim_bridge/            #   Python 仿真桥(MuJoCo + rclpy)
@@ -198,7 +211,7 @@ ros-hotplug-by-dsh/
 │   ├── robot/                     #   IK/轨迹/频率(对照公开基线)
 │   ├── agent/                     #   agent vs oracle vs random
 │   ├── hotplug/                   #   热插拔 5 指标
-│   └── native_swap/               #   ROS2 原生换末端实测(待测实验)
+│   └── native_swap/               #   ROS2 原生换末端实测(推迟待办, 用户决策 2026-08)
 ├── demo/                          #   教学(00~13, 证据链)
 ├── docs/                          #   本设计文档 + 亮点 + 机制 + 留痕
 └── plugins/                       #   动态插件归档(工作流类)
@@ -209,27 +222,28 @@ ros-hotplug-by-dsh/
 | 层 | 交付件 | 形态 | 作用 |
 |---|---|---|---|
 | L0 | GitHub 公开仓库 | repo | 总载体 + 证据链 |
-| L1 | 能力包（树外包） | npm 包 | 每个末端/感知一个能力，可安装 |
-| L2 | agent preset | 目录 | 开箱即用的机器人 agent 配置 |
+| L1 | 能力（仓库目录 + 挂载服务） | 目录 + 常驻插件 | 每个末端/感知一个能力，运行时挂载/卸载（热插拔本体） |
+| L2 | agent preset | 目录 | 开箱即用的机器人 agent 配置（只感知，不装配） |
 | L3 | 机器人侧包 | ROS2 colcon 包 | 控制节点 + 仿真桥 |
 | L4 | 桥接契约 + SDK | 文档 + Python 库 | 对外 API（唯一自造 API） |
 | L5 | 评测套件 | eval/ 脚本 | 一键出指标 |
 | L6 | 证据与文档 | docs/ | 主张/对比/基线/留痕 |
 
-### 10.3 L1 能力包（树外包，热插拔的载体）
+### 10.3 L1 能力与能力挂载服务（热插拔本体）
 
-- **包**：`@ros-hotplug/dsh-plugin-grasp`、`-suction`、`-detect`（每末端/感知一个）。
-- **包内**：`package.json`（`dsh` 字段声明 host 入口 + 可选 client 入口）、`src/host.js`（工具实现）、`manifest.json`（元数据+sha256）、可选 `client/`（面板 UI）、`README.md`。
-- **功能**：注册一个能力工具（grasp/suction/detect），`execute` 经桥驱动 ROS2；manifest 供挂载校验；版本供升级/回滚。
+- **一等交付件 = 能力仓库目录**：`repo/<capability>/<version>/{host.js, manifest.json}`。host.js 是 ESM `{apply, inject, name}` 插件，**零依赖**（不 import 任何包，直接用注入服务 + 手写 Tool 契约）；manifest.json 记录元数据 + host.js 的 sha256。
+- **npm 树外包 = 可选发布外壳**：`pack.sh` 把仓库目录打包成 tarball 分发到机器，解包进仓库后走**同一条挂载服务**，不再是「安装 = 挂载」。
+- **挂载服务（mount_service）**：host 常驻插件（组合挂载，非动态沙箱）。`mount(cap, version)` = mount_guard 校验 sha256 → 动态 import host.js → `ctx.plugin(...)` 挂到机器作用域（工具立即可见）→ 返回句柄；`unmount(handle)` = `await fiber.dispose()`（精确回收）。写入口 = web 面板 RPC；**不注册任何 agent 工具**（agent 物理上无法挂/卸，§7.6）。
+- **能力功能**：注册一个能力工具（grasp/suction/detect），`execute` 经桥驱动 ROS2。
 - **API 形式**：**DSH 标准 Tool 契约**（`{name, description, parameters(JSON Schema), output{schema,render}, execute(args)}`）——用 DSH 现成接口，不造新协议。
-- **树外包与动态插件的区别**：demo 里是动态插件（进程内、临时、演示用）；树外包是持久、可发布、带版本与安全语义的正式交付形态。**热插拔是 DSH 机制，树外包是被热插拔的载体。**
+- **三种形态的关系**：仓库目录 = 开发/本地验证；npm 树外包 = 发布外壳；动态插件 = 调试/一次性演示（沙箱禁框架内部，不能承载挂载服务）。**热插拔 = DSH 的运行时挂载机制（ctx.plugin/dispose），仓库目录是被热插拔的载体。**
 
 ### 10.4 L2 运行载体（agent preset）
 
 - **形态**：一个**目录**（`~/.dsh/.agent-presets/robo/`），不是 npm 包。
-- **内容**：`agent.cordis.yml`（组合：能力包行 + **isolate group** 包能力 + 事件监听）、persona（「感知末端状态，自适应选策略，不做低层控制」）、skills。
-- **功能**：装上后 `dsh web` 新建会话选「robo」= 得到开箱即用的机器人任务 agent；可再配观测 agent（订阅事件汇报能力集）与评测 subagent。
-- **API 形式**：**cordis.yml 组合声明**（插件行/isolate/作用域）+ persona/skill 文本。
+- **内容**：`agent.cordis.yml`（组合：persona 行 + observer 行 + skills 挂载；**不含能力包行**——末端装配是机器事实，由挂载服务负责，preset 不决定）、persona（「感知末端状态，自适应选策略，不做低层控制」）、skills。
+- **功能**：装上后 `dsh web` 新建会话选「robo」= 得到开箱即用的机器人任务 agent；观测插件订阅 `tools/change` 汇报能力集。
+- **API 形式**：**cordis.yml 组合声明**（插件行/作用域）+ persona/skill 文本。
 
 ### 10.5 L3 机器人侧（ROS2 包）
 
@@ -265,9 +279,9 @@ class Bridge:
 
 ### 10.7 扩展性与适应性四原则
 
-1. **能力接口标准化**：能力 = 工具 + manifest + SDK，加新末端按 `capability-spec.md` 模板写包，不改框架；
+1. **能力接口标准化**：能力 = 工具 + manifest + SDK，加新末端按 `capability-spec.md` 模板写能力目录，不改框架；
 2. **消息契约版本化**：schema 文档化，桥两端独立演进；
-3. **能力包与 preset 解耦**：包不依赖 preset，preset 只组合；
+3. **能力与 preset 解耦**：能力不依赖 preset（preset 不装配能力，只感知）；preset 不依赖具体能力；
 4. **仿真/真机同接口**：只换 L3 底层（`ros2_control hardware_interface`），L1/L2/L4 不动。
 
 ---
@@ -296,11 +310,11 @@ class Bridge:
 
 | 指标 | 验收标准 |
 |---|---|
-| 插入即见 | 挂载后 agent 立即能调用新工具 |
+| 插入即见 | 挂载后 agent 立即能调用新工具（无需重启） |
 | 拔出即回收 | 卸载后无残留订阅/连接（可观测 teardown） |
 | 同名不串台 | 两个同型能力注册不冲突、调用不串 |
-| agent 无感切换 | 版本 `update` 期间任务成功率不下降 |
-| 失败回滚 | 注入故障后自动回滚且旧能力仍可用 |
+| agent 无感切换 | 换版（卸载旧/挂新）期间任务成功率不下降 |
+| 失败回滚 | 新版本激活失败后旧能力仍可用 |
 
 ### 11.4 待实测项（禁止预填）
 
