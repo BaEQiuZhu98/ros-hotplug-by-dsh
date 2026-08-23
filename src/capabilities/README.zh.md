@@ -1,31 +1,23 @@
 # src/capabilities — 能力与热插拔本体
 
-能力仓库 + 挂载服务都在这里(设计文档 §10.3): 每个末端/感知能力 = 一个**仓库目录**(host.js + manifest),
-热插拔本体 = **能力挂载服务**(运行时挂载/卸载, 不重启); agent 只感知, 不装配.
+设计文档 §10.3: 每个末端能力 = 一个**仓库目录**(host.js + manifest), 挂载后成为臂作用域上的
+带策略实例; 热插拔 = 实例在臂作用域上的注册与撤销(运行时, 不重启). 唯一写者 = 人(web 面板);
+agent 只经 arm_status/take_object 感知与执行, 不感知末端实现细节.
 
 ## 目录
 
 | 文件/目录 | 作用 |
 |---|---|
-| `capability-spec.md` | 能力开发规范 v2(模板 + manifest 字段 + 挂载服务契约 + 换版/回滚) |
-| `mount_guard.py` | 挂载前哈希校验(零信任, 从 demo/13 固化; 挂载服务 mount 的第一步) |
-| `mount_service/` | 能力挂载服务(host 常驻插件: 校验 + `ctx.plugin` 运行时挂载 + `fiber.dispose` 卸载; 唯一写入口 = web 面板 RPC, 不注册 agent 工具) |
+| `capability-spec.md` | 能力开发规范(模板 + manifest + 挂载体系契约 + 版本策略) |
+| `mount_guard.py` | 挂载前哈希校验(零信任; 挂载服务准入第一步) |
+| `mount_service/` | 能力挂载服务(host 常驻: 准入检查 + 臂管理; 含 web 面板 host/client) |
 | `repo/` | 能力仓库目录(一等交付件): `repo/<cap>/<version>/{host.js, manifest.json}`, host.js 零依赖 |
-| `pack.sh` | 可选发布外壳: 仓库目录打包成 npm tarball(公开分发用; 解包进仓库后走同一挂载服务) |
+| `pack.sh` | 可选发布外壳: 仓库目录打包成 npm tarball(公开分发用) |
 
-## 历史记录(旧实现, 已按新架构重构)
+## 关键语义
 
-- 阶段 1 曾以 npm 树外包 + `dsh plugin add` 验证「安装 = 挂载」路径: 包进 `dsh.profile.bundles`、
-  组合树挂行、升级/回滚 = 重装 tarball + 重启进程. 该路径**分发语义正确、挂载语义缺失**(冷插拔),
-  已被挂载服务(热插拔)取代; 树外包降级为发布外壳.
-- 阶段 2 曾把能力行放进 robo preset(会话作用域), 存在「全局 bundles 行兜底导致 preset disabled 失效」
-  的问题; 现 preset 不含能力行, 末端装配统一由挂载服务负责(机器事实唯一).
-
-## 用户决策(2026-08-22, 已确认)
-
-- 交付形式按需选择: 仓库目录(开发/验证) / npm 发布外壳(公开分发) / 动态插件(调试).
-- 唯一写者 = 人(web 面板); agent 只能感知(工具表 + capability_status + tools/change), 物理上无挂/卸工具.
-- 挂载服务必须是组合挂载的真实插件: 动态沙箱 ctx 隐藏 `ctx.plugin` 等框架内部(已实测).
-- SDK 保持薄(校验内置, 能力代码只调 bridge_client.py CLI).
-- 灰度不做; 回滚保留(挂载句柄模型).
-- 评测主打公开基线达成; native_swap 推迟(记 HANDOFF 待办).
+- **能力 = 带策略实例**: grasp = 夹取策略, suction = 吸附策略; 实例同名注册 manipulate,
+  靠臂作用域隔离(两臂可挂同名末端, 互不串台).
+- **准入与作用域分工**: 配置表只做「放行/拒绝」(sha256 + 规则表), 作用域回答「挂在哪/何时生灭/谁看得见」.
+- **同臂防重**: 同一条臂重复挂同一 cap@version 被拒; 挂别的末端自动替换.
+- **agent 屏蔽细节**: agent 只有 arm_status(感知 ready)与 take_object(执行); 夹取/吸附策略在实例内部.

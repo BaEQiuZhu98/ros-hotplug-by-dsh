@@ -71,69 +71,171 @@
 
 ## 7. 系统设计
 
-### 7.1 分层架构
+### 7.1 作用域层级
 
 ```
-[任务/自然语言指令: "抓小球"]
-        ↓
-DSH Agent（感知 + 策略 + 决策，不做低层控制）
-        ↓ 工具调用（能力工具: grasp / suction / detect ...） ← 热插拔发生在这里
-DSH 能力层（经 rosbridge 的桥接契约）
-        ↓ WebSocket ↔ ROS2 话题
-ROS2 控制层（C++ 高频控制节点 + Python 仿真桥）
-        ↓
-MuJoCo 仿真（双臂 + 多末端执行器 + 场景） / 真机（换 hardware_interface）
+层 0  全局(机器)            宿主组合挂载, 所有 agent 向下继承
+   ├─ sim_bridge(ROS2 进程)     物理真相: 双臂关节/末端/小球状态
+   ├─ 能力挂载服务(host 常驻)    准入检查 + 臂管理 + 实例注册; 不注册 agent 工具
+   ├─ web 面板(host + client)   唯一写入口(装/卸末端)
+   └─ tools 注册表(宿主服务)     工具注册的层容器
+
+层 1  agent(任务 agent)      robo preset 挂载(每会话)
+   ├─ persona                  「感知末端状态, 自适应决策, 不做低层控制, 不感知末端实现细节」
+   ├─ 臂管理器                  会话内创建/持有 armA、armB 作用域, 执行挂载/卸载
+   ├─ observer                  订阅 tools/change, 汇报能力集(观测能力)
+   ├─ arm_status 工具           感知入口: 某臂是否具备可用末端
+   └─ take_object 工具          执行入口: 让某臂去拿东西(策略由末端实例决定)
+
+层 2  机械臂 armA / armB     createScope(agentCtx, 'armA' / 'armB'), 会话创建时预建(空层)
+   └─ 该臂的末端能力实例(挂/卸都发生在这层)
+
+层 3  末端实例              带策略能力插件(§10.3), 挂在臂层上:
+   ├─ armA 挂 grasp  -> 夹取策略实例(同名注册 manipulate)
+   └─ armB 挂 suction -> 吸附策略实例(同名注册 manipulate)
 ```
 
-### 7.2 agent 的角色：感知与自适应（重要修正）
+热插拔的对象 = **带策略的末端能力实例**, 在臂作用域上生灭; 同名实例靠作用域隔离, 互不串台.
 
-- **agent 不控制「自己具备什么末端」**。末端的挂载/更换由**人 / 平台 / 运维**完成（外部事件）。
-- **agent 也没有挂载权限**：挂载/卸载的唯一写入口是 web 面板（人点击）→ 能力挂载服务；agent 的工具表里根本没有挂/卸工具，物理上无法修改末端装配（写路径/读路径分离，见 §7.6）。
-- agent 的角色是：
-  1. **感知**：当前有哪些末端能力可用（工具表 / 能力状态查询 / `tools/change` 事件）；
-  2. **推理**：对**同一个语言命令**（如「抓小球」，不含「用夹爪」这种限定），根据当前末端状态**自适应选择策略与计算方式**——有夹爪走夹取策略、有吸盘走吸附策略、没有末端则报告「当前没有末端执行器，无法抓取」；
-  3. **执行**：调用当前可用的那个能力工具。
-- 热插拔发生时：agent 收到事件 → 更新感知 → **之后同一条命令自动换策略**。这就是「agent 无感 + 自适应」的完整含义。
+### 7.2 作用域与可见性
 
-### 7.3 一次完整交互（演示的目标表现）
+- 层 0 注册的内容对所有 agent 可见(全局继承).
+- 臂层在 agent 之下, **子层不上浮**到工具表: agent 不直接看到末端实例, 经 `arm_status` /
+  `take_object` 访问(§7.5); 查询按臂作用域解析(`tools.get(name, armKey)` 的现成语义).
+- armA 与 armB 是同级的两个作用域: 同名 manipulate 实例各自独立、互不遮蔽、互不串台.
+- 事件放行向上扩展: 臂层挂/卸触发 tools/change, observer 在 agent 层收到.
 
-1. 场景：双臂 + 小球，两臂都无末端。
-2. 用户：「**抓小球**」。agent 感知：无末端能力 → 回复「当前没有末端执行器，无法抓取」。
-3. 人/平台热插拔：给臂 A 挂上夹爪能力。
-4. 用户再说「**抓小球**」。agent 感知：夹爪可用 → 夹取策略 → 调 `grasp` → 臂 A 末端变红、移到小球（抓取）。
-5. 人/平台热插拔：把夹爪换成吸盘（卸载 grasp、挂载 suction）。
-6. 用户第三次说「**抓小球**」。agent 感知：吸盘可用 → 吸附策略 → 调 `suction` → 末端变蓝、移到小球（吸附）。
+### 7.3 capabilities 准入检查(配置表, 不是作用域)
 
-> 核心看点：**同一句命令，agent 三次给出与末端状态匹配的策略**；切换全程 agent 无感、机器人不停机。
+| 问题 | 落点 |
+|---|---|
+| 末端**能不能**挂(完整性/来源) | mount_guard: host.js 的 sha256 与 manifest 比对, 不通过直接拒绝 |
+| 这条臂**允许**挂什么 | 挂载服务内的规则表: 臂 A/B 的允许末端类型 + 同臂防重/替换规则 |
+| 现在挂的是什么 | 挂载服务按臂记录 {arm, cap, version, 实例句柄} |
+| 挂到**哪**、何时生灭、谁看得见 | 作用域(臂层), 不是配置表 |
 
-### 7.4 多 agent 设计
+配置表只做「放行/拒绝」, 从不持有实例. 检查顺序: sha256 → 规则表 → 落位(臂作用域注册).
 
-- **任务 agent**（主）：感知 + 策略 + 调用能力工具（如上）。
-- **观测/运维 agent**：订阅能力增删事件与状态，汇报「当前能力集合 / 热插拔日志」（支撑可靠性点「事件通知」）。
-- **评测 subagent**：委托跑 `eval/`（对应「Subagent 委托」知识点）。
+### 7.4 agent 的角色: 感知与自适应
 
-### 7.5 热插拔机制设计
+- **agent 不控制「自己具备什么末端」**, 也**不感知末端的实现细节**(夹爪/吸盘是实例内部的事):
+  末端的挂载/更换由**人 / 平台 / 运维**完成(外部事件), agent 只感知「这条臂是否具备可用末端」.
+- **agent 没有挂载权限**: 挂载/卸载的唯一写入口是 web 面板(人点击)→ 能力挂载服务;
+  agent 的工具表里没有挂/卸工具, 物理上无法修改末端装配(§7.11).
+- agent 的职责:
+  1. **感知**: 调 `arm_status(arm)` 判断该臂是否具备可用末端(只读布尔, 不看型号);
+  2. **决策**: 对**同一个语言命令**(如「抓小球」, 不含「用夹爪」这种限定)按感知结果决策:
+     有可用末端 → 调 `take_object(arm)` 执行; 无末端 → 报告「当前没有末端执行器, 无法抓取」;
+  3. **执行**: 调 `take_object(arm)`, 具体的夹取/吸附策略由该臂当前末端实例内部完成.
+- 热插拔发生时: agent 收到事件 → 更新感知 → **之后同一条命令自动换策略**(同一 API,
+  实例已换成新末端) . 这就是「agent 无感 + 自适应」的完整含义.
+
+### 7.5 agent 工具接口(屏蔽末端实现细节)
+
+| 工具 | 语义 | 返回 |
+|---|---|---|
+| `arm_status(arm)` | 感知: 该臂是否具备可用末端 | `{ready: true/false}`; false 时含原因(无末端/物理不匹配) |
+| `take_object(arm)` | 执行: 让该臂去拿东西 | 结构化结果(成功/失败 + 原因) |
+
+- agent 的决策面只有 `ready` 一个布尔, prompt 不含任何末端型号知识;
+  换末端、加新末端(拧螺丝/焊接)不改 persona 与工具接口.
+- 末端实现细节(夹取策略/吸附策略)全部在实例内部; 观测与解释由 observer 日志
+  与 sim_bridge 状态回传承担(不靠 agent 输出).
+- 能力实例同名注册 `manipulate`(每臂一个), 臂间靠作用域隔离; agent 不直接调用它,
+  `take_object(arm)` 在会话内按臂作用域找到当前实例并分派.
+
+### 7.6 多 agent
+
+- **任务 agent**(主): 感知 + 决策 + 调用 take_object(如上).
+- **观测 agent**: 订阅 tools/change 与状态回传, 汇报「当前能力集合 / 热插拔日志」(可靠性点「事件通知」).
+- **评测 subagent**: 委托跑 `eval/`.
+
+### 7.7 初始化状态
+
+**进程启动(dsh web + rosbridge + sim_bridge)之后**: sim_bridge 双臂伸直、末端无(none)、
+小球在初始位置; 挂载服务读能力仓库清单与准入规则, 无任何末端挂载; 面板渲染仓库清单与两臂空状态.
+
+**创建 robo 会话(agent 初始化)之后**: persona/observer/arm_status/take_object 就绪;
+臂管理器在 agent 上下文下预建 armA、armB 两条**空**作用域(挂载点就位, 无末端实例).
+此时 agent 对「抓小球」如实报告「当前没有末端执行器, 无法抓取」.
+
+### 7.8 装载末端的流程(以「给臂 A 装夹爪 grasp@1.0.0」为例)
+
+| # | 谁 | 干什么 |
+|---|---|---|
+| 1 | 人(面板 client) | 点「臂 A -> grasp@1.0.0」→ host.call arm_mount{arm:A, cap:grasp, version:1.0.0} |
+| 2 | 面板 host | 参数校验 → 转发能力挂载服务 mount(cap, version, {arm}) |
+| 3 | 挂载服务 | **准入检查**: 读仓库目录 → sha256 与 manifest 比对(不通过 → 拒绝, 流程终止) |
+| 4 | 挂载服务 | **规则表检查**: 臂 A 已挂同 cap@version → 拒绝(同臂防重); 已挂别的 → 先卸载(替换); 未挂 → 放行 |
+| 5 | 挂载服务 | 动态 import host.js(带策略插件模块) → 转会话内臂管理器 |
+| 6 | 臂管理器 | 在 **armA 作用域** ctx.plugin(插件) → 插件 apply 注册 manipulate 实例(同名, armA 层); fiber.await 确认激活; 失败回收并拒绝 |
+| 7 | 挂载服务 | 记录 {armA: grasp@1.0.0, 句柄}; tools/change 广播(observer 收到, 更新能力集汇报) |
+| 8 | 面板 host | 挂载 ok → 物理装配 set_tool(A, grasp)(sim_bridge 臂 A 末端变红; 物理失败仅告警, 不回滚已成功的注册) |
+| 9 | 面板 client | 刷新状态: 臂 A 行 grasp@1.0.0 高亮 |
+| 10 | agent | 下次 arm_status(A) = {ready: true}; take_object(A) 自动走夹取策略 |
+
+卸载为对称流程: 面板点取消 → 挂载服务查臂句柄 → 臂管理器在 armA 层 dispose(实例注销,
+不影响 armB) → 面板 set_tool(A, none)(末端复位) → 状态刷新.
+
+### 7.9 拿小球指令的流程(以「用臂 A 去拿小球」为例)
+
+前置: 臂 A 已挂 grasp(夹取策略实例), 臂 B 已挂 suction(吸附策略实例).
+
+| # | 谁 | 干什么 |
+|---|---|---|
+| 1 | 人(面板 client) | 点「臂 A -> 去拿小球」→ inputActions 发送消息「用臂 A 去拿小球」(面板不判断、不执行) |
+| 2 | agent | 收到指令, persona 驱动: 先感知 → 调 arm_status(A) |
+| 3 | 臂管理器/observer | 按臂作用域查询返回 {ready: true} |
+| 4 | agent | 决策: 臂 A 有可用末端 → 调 take_object(arm: 'A') |
+| 5 | 会话内分发 | 按臂作用域找到 armA 层当前 manipulate 实例 → 调实例.execute() |
+| 6 | 末端实例(夹取策略) | 感知物理末端(必须匹配, 否则报错, 绝不改变装配) → 执行夹取策略(接近/夹取/状态校验) → 经 SDK → rosbridge → sim_bridge |
+| 7 | sim_bridge | IK 求解, 臂 A 转动触球, 更新 /joint_state 回传 |
+| 8 | 末端实例 | 状态校验(回传确认末端到位) → 返回结构化结果 |
+| 9 | agent | 收到结果, 如实汇报(感知到什么/做了什么/结果如何) |
+
+**分支**:
+
+- 臂 A 无末端: arm_status(A) = {ready: false} → agent 报告「臂 A 没有末端执行器, 无法拿」.
+- 末端已挂但物理不匹配: 实例第 6 步报错 → agent 如实报告.
+- 换末端后同一句指令: 面板把 A 换挂 suction 后, 同一句「用臂 A 去拿小球」→ arm_status(A)
+  仍 ready → take_object(A) → 实例已是吸附策略 → agent 无感自动换策略.
+
+### 7.10 热插拔机制
 
 | 操作 | 机制 | 效果 |
 |---|---|---|
-| 挂载能力 | 挂载服务校验 manifest 后在**机器作用域**运行时注册插件（`ctx.plugin`） | 立刻对 agent 可见可用，**不重启** |
-| 卸载能力 | 挂载服务 `fiber.dispose()`（异步，精确回收） | 精确回收其订阅/连接，agent 无感 |
-| 替换能力 | 卸载旧能力 + 挂载新能力（能力仓库按版本目录并存） | 切换期间 agent 无感 |
-| 同名隔离 | isolate realm / 作用域遮蔽（nearest-wins） | 两个夹爪/吸盘实例互不串台 |
-| 失败回滚 | 挂载服务保留旧句柄，新版本激活失败则旧能力仍在 | 旧能力不受影响 |
-| 变化感知 | 事件广播（tools/change）+ agent 订阅 | agent 自动感知能力增删 |
+| 挂载末端 | 准入检查后在**臂作用域**运行时注册实例(`ctx.plugin`) | 立即生效, **不重启** |
+| 卸载末端 | 臂层 `fiber.dispose()`(异步, 精确回收) | 精确回收其订阅/连接, 不影响另一臂 |
+| 替换末端 | 卸载旧实例 + 挂载新实例(能力仓库按版本目录并存) | agent 无感, 同一 take_object 自动换策略 |
+| 同名隔离 | 臂作用域: 同名 manipulate 实例并存, 各自生灭 | 两个末端实例互不串台 |
+| 失败回滚 | 新实例激活失败则旧句柄保留, 旧实例仍在 | 旧末端照常可用 |
+| 变化感知 | 事件广播(tools/change) + agent 订阅 | agent 自动感知末端增删 |
 
-### 7.6 写路径与读路径分离（唯一写者 = 人）
+### 7.11 写路径与读路径分离(唯一写者 = 人)
 
 ```
-写路径(唯一):  人 ──点击──► web 面板 ──RPC──► 能力挂载服务 ──► 挂载/卸载/换版本
-读路径(agent): 任务 agent ──► 工具表 + capability_status(只读感知, 自适应选策略)
-               观测 agent ──► tools/change 事件(只读订阅, 汇报能力集)
+写路径(唯一):  人 ──点击──► web 面板 ──RPC──► 能力挂载服务(准入) ──► 臂管理器(作用域挂/卸)
+读路径(agent): 任务 agent ──► arm_status(感知) + take_object(执行, 只读使用)
+               观测 agent ──► tools/change 事件 + 状态回传(只读订阅, 汇报能力集)
 ```
 
-- 能力挂载服务是**组合挂载的真实插件**（host 常驻行），不是动态沙箱插件：动态插件的沙箱 ctx 刻意隐藏 `plugin` 等框架内部，而挂载服务需要 `ctx.plugin`/`fiber.dispose` 这两条运行时挂/卸原语（即动态插件 `cordis_run` 的底层同款机制，已源码核实）。
-- 挂载与卸载是异步动作：`ctx.plugin` 返回后 apply 尚未跑完，`dispose` 返回后回收尚未完成；挂载服务要返回「就绪」信号，卸载要 await dispose 完成。
-- agent 拿不到挂/卸工具 = 作用域天然隔离，不靠 persona 规劝。
+- 能力挂载服务与臂管理器都是**组合挂载的真实插件**, 不是动态沙箱插件: 动态插件的沙箱
+  ctx 隐藏 `ctx.plugin`/`fiber` 等框架内部, 而挂载/卸载需要这两条运行时原语.
+- 挂载与卸载是异步动作: `ctx.plugin` 返回后 apply 尚未跑完, `dispose` 返回后回收尚未完成;
+  挂载流程等待 `fiber.await()` 确认激活, 卸载流程 await dispose 完成.
+- agent 拿不到挂/卸工具 = 作用域天然隔离, 不靠 persona 规劝.
+
+### 7.12 一次完整交互(演示的目标表现)
+
+1. 场景: 双臂 + 小球, 两臂都无末端.
+2. 用户: 「**抓小球**」. agent 感知: arm_status 均为 not ready → 回复「当前没有末端执行器, 无法抓取」.
+3. 人热插拔: 在面板给臂 A 挂上 grasp 末端能力(夹取策略实例).
+4. 用户再说「**抓小球**」. agent 感知: 臂 A ready → 调 `take_object(A)` → 实例走夹取策略 → 臂 A 末端变红、移到小球(抓取).
+5. 人热插拔: 在面板把臂 A 的 grasp 换成 suction(卸载旧实例、挂载吸附策略实例).
+6. 用户第三次说「**抓小球**」. agent 感知: 臂 A 仍 ready → 再调 `take_object(A)` → 实例已换成吸附策略 → 末端变蓝、移到小球(吸附).
+
+> 核心看点: **同一句命令、同一个 API, agent 三次给出与末端状态匹配的结果**;
+> 切换全程 agent 无感、机器人不停机, 且 agent 从头到尾不知道「夹爪/吸盘」这些实现细节.
 
 ---
 
@@ -141,25 +243,25 @@ MuJoCo 仿真（双臂 + 多末端执行器 + 场景） / 真机（换 hardware_
 
 | 工程实践 | 本项目落点 | 验证方式 |
 |---|---|---|
-| 零信任安全流水线 | 能力挂载前 manifest / 哈希校验，不合法拒绝 | 传入篡改 manifest → 拒绝挂载 |
-| 主备冗余 + 多版本共存 | 同一能力多版本共存 | 同时注册 v1/v2 不冲突 |
-| 灰度升级 + 业务零中断 | 卸载旧能力 + 挂载新能力，agent 无感 | 切换期间任务不中断 |
-| 异常秒级自动回滚 | 新能力激活失败则旧句柄保留，旧能力仍在 | 注入故障 → 旧能力照常可用 |
-| 发布/订阅事件通知 | 能力增删广播事件，agent 订阅感知 | 挂载/卸载时事件被收到 |
-| 硬件差异屏蔽层 | 能力抽象层：同型末端同名遮蔽 | 两末端执行器同名遮蔽正确 |
-| 高可用 / 资源不泄漏 | isolate 隔离 + dispose 精确回收 | 卸载后无残留连接/状态 |
+| 零信任安全流水线 | 末端挂载前 manifest / 哈希校验，不合法拒绝 | 传入篡改 manifest → 拒绝挂载 |
+| 主备冗余 + 多版本共存 | 同一末端能力多版本并存(能力仓库版本目录) | 同臂换版、多臂不同版本并存不冲突 |
+| 换版切换 + 业务零中断 | 卸载旧实例 + 挂载新实例，agent 无感 | 切换期间任务不中断 |
+| 异常秒级自动回滚 | 新实例激活失败则旧句柄保留，旧实例仍在 | 注入故障 → 旧末端照常可用 |
+| 发布/订阅事件通知 | 末端增删广播事件，agent 订阅感知 | 挂载/卸载时事件被收到 |
+| 硬件差异屏蔽层 | agent 只感知 ready, 夹取/吸附策略在实例内部 | 换末端后同一 API 自动换策略 |
+| 高可用 / 资源不泄漏 | 臂作用域隔离 + dispose 精确回收 | 卸载后无残留连接/状态 |
 
 ### 8.1 各可靠性点的机制与落地
 
 | # | 可靠性点 | DSH 机制 | 怎么证明 |
 |---|---|---|---|
-| 1 | 零信任/哈希校验 | 挂载守卫（挂载服务内）+ 机器作用域注册 | 篡改 manifest 哈希 → `mount_guard` 拒绝挂载 |
-| 2 | 多版本共存 | 能力仓库版本目录并存 + 不可变包 | v1/v2/v3 并存、互不覆盖 |
-| 3 | 换版切换 | 卸载旧能力 + 挂载新能力 | 切换期间工具名不变，agent 无感 |
-| 4 | 失败回滚 | 挂载服务保留旧句柄，新版本激活失败旧能力仍在 | 注入坏版本 → 挂载失败 → 旧能力照常可用 |
-| 5 | 事件通知 | `tools/change` 等事件广播 + 订阅 | 挂/卸时监听器收到事件 |
-| 6 | 同名遮蔽 | nearest-wins + isolate realm | 两同型能力同名注册不串台 |
-| 7 | 不泄漏 | isolate + Cordis dispose | 卸载后确认无残留订阅/状态 |
+| 1 | 零信任/哈希校验 | 挂载守卫(挂载服务内) + 臂作用域注册 | 篡改 manifest 哈希 → 拒绝挂载 |
+| 2 | 多版本共存 | 能力仓库版本目录并存 | 各臂可挂不同版本、互不覆盖 |
+| 3 | 换版切换 | 卸载旧实例 + 挂载新实例 | 切换期间 API 不变, agent 无感 |
+| 4 | 失败回滚 | 新实例激活失败则旧句柄保留 | 注入坏版本 → 挂载失败 → 旧末端照常可用 |
+| 5 | 事件通知 | `tools/change` 事件广播 + 订阅 | 挂/卸时监听器收到事件 |
+| 6 | 同名隔离 | 臂作用域: 同名 manipulate 实例并存 | 两臂同名末端注册不串台 |
+| 7 | 不泄漏 | 臂作用域 + Cordis dispose | 卸载后确认无残留订阅/状态 |
 
 > **零信任/哈希校验的威胁模型**：能力可能来自**外部分发**或 **agent 现场生成**（大模型会幻觉、可被注入诱导），也可能在**存储/流转中被篡改**。因此「每次挂载都假设不可信，先验身再上机」——哈希证明「没被改过」，签名（可选加分项）证明「确实出自某人」，即「云端签名/加密 → 设备验签/解密」的零信任流水线。demo 13 先做哈希闭环，签名留作扩展。
 
@@ -193,11 +295,11 @@ ros-hotplug-by-dsh/
 │   ├── capabilities/              # ★ 能力仓库 + 挂载服务 + 规范
 │   │   ├── capability-spec.md     #   能力开发规范(模板 + manifest + 挂载流程)
 │   │   ├── mount_guard.py         #   挂载前哈希校验(零信任)
-│   │   ├── mount_service/         #   能力挂载服务(host 常驻插件: 校验 + 运行时挂/卸; 唯一写入口)
+│   │   ├── mount_service/         #   能力挂载服务(host 常驻: 准入检查 + 臂管理; 含 web 面板)
 │   │   ├── repo/                  #   能力仓库目录(一等交付件): grasp/1.0.0/{host.js, manifest.json} ...
 │   │   └── pack.sh                #   可选发布外壳: 仓库目录打包成 npm tarball(公开分发用)
 │   ├── presets/                   #   运行载体
-│   │   └── robo/                  #   agent.cordis.yml(persona + observer + skills, 无能力行) + 技能
+│   │   └── robo/                  #   agent.cordis.yml(persona + observer + 臂管理器 + arm_status/take_object + skills)
 │   ├── ros2/                      #   机器人侧(colcon 包)
 │   │   ├── cpp_control/           #   C++ 高频控制节点(1kHz, PID)
 │   │   └── sim_bridge/            #   Python 仿真桥(MuJoCo + rclpy)
@@ -211,7 +313,7 @@ ros-hotplug-by-dsh/
 │   ├── robot/                     #   IK/轨迹/频率(对照公开基线)
 │   ├── agent/                     #   agent vs oracle vs random
 │   ├── hotplug/                   #   热插拔 5 指标
-│   └── native_swap/               #   ROS2 原生换末端实测(推迟待办, 用户决策 2026-08)
+│   └── native_swap/               #   ROS2 原生换末端实测(待测实验)
 ├── demo/                          #   教学(00~13, 证据链)
 ├── docs/                          #   本设计文档 + 亮点 + 机制 + 留痕
 └── plugins/                       #   动态插件归档(工作流类)
@@ -229,21 +331,29 @@ ros-hotplug-by-dsh/
 | L5 | 评测套件 | eval/ 脚本 | 一键出指标 |
 | L6 | 证据与文档 | docs/ | 主张/对比/基线/留痕 |
 
-### 10.3 L1 能力与能力挂载服务（热插拔本体）
+### 10.3 L1 能力与挂载体系（热插拔本体）
 
-- **一等交付件 = 能力仓库目录**：`repo/<capability>/<version>/{host.js, manifest.json}`。host.js 是 ESM `{apply, inject, name}` 插件，**零依赖**（不 import 任何包，直接用注入服务 + 手写 Tool 契约）；manifest.json 记录元数据 + host.js 的 sha256。
-- **npm 树外包 = 可选发布外壳**：`pack.sh` 把仓库目录打包成 tarball 分发到机器，解包进仓库后走**同一条挂载服务**，不再是「安装 = 挂载」。
-- **挂载服务（mount_service）**：host 常驻插件（组合挂载，非动态沙箱）。`mount(cap, version)` = mount_guard 校验 sha256 → 动态 import host.js → `ctx.plugin(...)` 挂到机器作用域（工具立即可见）→ 返回句柄；`unmount(handle)` = `await fiber.dispose()`（精确回收）。写入口 = web 面板 RPC；**不注册任何 agent 工具**（agent 物理上无法挂/卸，§7.6）。
-- **能力功能**：注册一个能力工具（grasp/suction/detect），`execute` 经桥驱动 ROS2。
-- **API 形式**：**DSH 标准 Tool 契约**（`{name, description, parameters(JSON Schema), output{schema,render}, execute(args)}`）——用 DSH 现成接口，不造新协议。
-- **三种形态的关系**：仓库目录 = 开发/本地验证；npm 树外包 = 发布外壳；动态插件 = 调试/一次性演示（沙箱禁框架内部，不能承载挂载服务）。**热插拔 = DSH 的运行时挂载机制（ctx.plugin/dispose），仓库目录是被热插拔的载体。**
+- **一等交付件 = 能力仓库目录**：`repo/<capability>/<version>/{host.js, manifest.json}`。host.js 是
+  ESM `{apply, inject, name}` 插件，**零依赖**；manifest.json 记录元数据 + host.js 的 sha256。
+- **能力 = 带策略的末端实例**：每个能力是「末端硬件 + 驱动策略」的完整单元(grasp = 夹取策略,
+  suction = 吸附策略), apply 在**臂作用域**注册同名 `manipulate` 工具, execute 内实现策略
+  (感知物理末端匹配 → 执行策略步 → 状态校验), **绝不改变装配**.
+- **npm 树外包 = 可选发布外壳**：`pack.sh` 把仓库目录打包成 tarball 分发到机器, 解包进仓库后走同一条挂载流程.
+- **能力挂载服务(mount_service)**：host 常驻插件(组合挂载, 非动态沙箱). 职责 = **准入检查**
+  (mount_guard 哈希 + 规则表: 允许末端类型/同臂防重/替换) + **臂管理**(按臂记录 {arm, cap, version});
+  实际 `ctx.plugin`/`fiber.dispose` 由会话内的**臂管理器**在 armA/armB 作用域执行(§7.1).
+  写入口 = web 面板 RPC; **不注册任何 agent 工具**.
+- **API 形式**：DSH 标准 Tool 契约; 热插拔 = DSH 的运行时挂载机制(ctx.plugin/dispose), 仓库目录是被热插拔的载体.
 
 ### 10.4 L2 运行载体（agent preset）
 
-- **形态**：一个**目录**（`~/.dsh/.agent-presets/robo/`），不是 npm 包。
-- **内容**：`agent.cordis.yml`（组合：persona 行 + observer 行 + skills 挂载；**不含能力包行**——末端装配是机器事实，由挂载服务负责，preset 不决定）、persona（「感知末端状态，自适应选策略，不做低层控制」）、skills。
-- **功能**：装上后 `dsh web` 新建会话选「robo」= 得到开箱即用的机器人任务 agent；观测插件订阅 `tools/change` 汇报能力集。
-- **API 形式**：**cordis.yml 组合声明**（插件行/作用域）+ persona/skill 文本。
+- **形态**：一个**目录**（`~/.dsh/.agent-presets/robo/`），不是 npm 包.
+- **内容**：`agent.cordis.yml`(组合: persona 行 + observer 行 + **臂管理器行**(会话内预建 armA/armB
+  作用域并执行挂/卸) + arm_status/take_object 工具行 + skills 挂载; **不含能力包行**——末端装配由
+  挂载体系负责, preset 只感知与执行)、persona(「感知末端状态, 自适应决策, 不做低层控制,
+  不感知末端实现细节」)、skills.
+- **功能**：装上后新建会话选「robo」= 开箱即用的机器人任务 agent; 观测插件订阅 `tools/change` 汇报能力集.
+- **API 形式**：cordis.yml 组合声明(插件行/作用域) + persona/skill 文本.
 
 ### 10.5 L3 机器人侧（ROS2 包）
 
@@ -257,32 +367,35 @@ ros-hotplug-by-dsh/
 **第一层：消息契约（`bridge/contract.md`，版本化）**
 
 ```text
-契约 v1.x
+契约 v1.x(完整定义见 bridge/contract.md)
   话题 /tool_config   类型 std_msgs/String  载荷 "ARM:TOOL"  语义 切末端执行器
   话题 /ball_position 类型 std_msgs/String  载荷 "x,y"       语义 设置小球位置
   话题 /touch_command 类型 std_msgs/String  载荷 "A"|"B"     语义 选臂触碰小球
-  话题 /capability_command 类型 std_msgs/String  载荷 "grasp"|"suction"  语义 激活能力(路径A)
-  话题 /joint_state   类型 ...                载荷 ...         语义 状态回传(反馈)
+  话题 /reset_command 类型 std_msgs/String  载荷 "reset"     语义 全部复位
+  话题 /joint_state   类型 std_msgs/String  载荷 JSON         语义 状态回传(反馈)
 ```
 
-**第二层：Python 薄 SDK（能力开发者/DSH 插件 host 共用）**
+**第二层：Python 薄 SDK（能力实例/DSH 插件 host 共用）**
 
 ```python
 class Bridge:
     def set_tool(self, arm, tool) -> dict:      # 校验 arm∈{A,B}, tool∈{grasp,suction,none}; 返回 {ok, error}
     def set_ball(self, x, y) -> dict:           # 校验数字; 返回 {ok, error}
     def touch(self, arm) -> dict:
-    def query_capabilities(self) -> dict:       # 查当前能力集(读状态回传)
+    def reset(self) -> dict:                    # 全部复位
+    def query_capabilities(self) -> dict:       # 查当前状态(读 /joint_state 回传)
 ```
 
 设计要点：校验在 SDK 层做（能力开发者免写校验）；rosbridge 细节全部隐藏；任何客户端（DSH 插件 host / Python 脚本）用同一份 SDK。
 
 ### 10.7 扩展性与适应性四原则
 
-1. **能力接口标准化**：能力 = 工具 + manifest + SDK，加新末端按 `capability-spec.md` 模板写能力目录，不改框架；
-2. **消息契约版本化**：schema 文档化，桥两端独立演进；
-3. **能力与 preset 解耦**：能力不依赖 preset（preset 不装配能力，只感知）；preset 不依赖具体能力；
-4. **仿真/真机同接口**：只换 L3 底层（`ros2_control hardware_interface`），L1/L2/L4 不动。
+1. **能力接口标准化**：能力 = 带策略实例 + manifest, 对 agent 只暴露 arm_status/take_object;
+   加新末端按 `capability-spec.md` 模板写能力目录, 不改框架、不改 agent 接口;
+2. **消息契约版本化**：schema 文档化, 桥两端独立演进;
+3. **能力与 preset 解耦**：能力不依赖 preset(preset 不装配、不感知末端型号, 只感知 ready);
+   preset 不依赖具体能力;
+4. **仿真/真机同接口**：只换 L3 底层(`ros2_control hardware_interface`), L1/L2/L4 不动.
 
 ---
 
@@ -310,11 +423,11 @@ class Bridge:
 
 | 指标 | 验收标准 |
 |---|---|
-| 插入即见 | 挂载后 agent 立即能调用新工具（无需重启） |
-| 拔出即回收 | 卸载后无残留订阅/连接（可观测 teardown） |
-| 同名不串台 | 两个同型能力注册不冲突、调用不串 |
-| agent 无感切换 | 换版（卸载旧/挂新）期间任务成功率不下降 |
-| 失败回滚 | 新版本激活失败后旧能力仍可用 |
+| 插入即见 | 挂载后 agent 立即感知 ready 并可用(无需重启) |
+| 拔出即回收 | 卸载后无残留订阅/连接(可观测 teardown) |
+| 同名不串台 | 两臂挂同名末端实例不冲突、调用不串 |
+| agent 无感切换 | 换末端/换版期间同一 API 自动换策略, 任务成功率不下降 |
+| 失败回滚 | 新实例激活失败后旧末端仍可用 |
 
 ### 11.4 待实测项（禁止预填）
 

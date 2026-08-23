@@ -55,18 +55,18 @@
 
 ### 3.1 Space axis: scopes + isolate realm (who sees whom)
 
-- Capabilities sit in layered scopes (global → preset standing → per agent); the registration view inherits downward, nearest-wins; `isolate` realm gives each mounted session a private instance, so same-type capabilities don't clash.
-- **Advantage**: mount = immediately visible to the agent; same-name capabilities don't conflict. Other solutions lack this primitive.
+- End-effector capability instances sit on per-arm scopes below the agent (global → agent → arm → instance); the agent perceives only a `ready` boolean and executes through `take_object`, while the grasp/suction strategies live inside the instances; sibling arm scopes let same-name instances coexist without cross-talk.
+- **Advantage**: mounting = immediately effective and agent-visible; same-name end-effectors never conflict. Other solutions lack this primitive.
 
 ### 3.2 Time axis: Cordis lifecycle (who lives and dies when)
 
 - A plugin's `apply(ctx)` hangs every side effect on the current Fiber, with disposers returned by `ctx.on`/`ctx.effect`; stop/update/remove tears them down in order.
 - **Advantage**: unmount = precise reclamation of connections/subscriptions/state. ROS2 lifecycle nodes give only a state machine, not guaranteed reclamation.
 
-### 3.3 Version timeline: plugin / package / run (grayscale + rollback)
+### 3.3 Version timeline: repo versions + mount handles (swap + rollback)
 
-- plugin (instance) / package (immutable version) / run (activation attempt): `cordis_define` appends immutable packages, `update` switches grayscale, failure can `run` rollback.
-- **Advantage**: multi-version coexistence + grayscale + rollback are built-in, not hand-written.
+- The capability repo stores immutable code under version directories; the mount system holds per-arm handles: swap = unmount old + mount new (a failed new instance keeps the old handle = rollback).
+- **Advantage**: multi-version coexistence + version swap + rollback are built-in, not hand-written. (Grayscale traffic-splitting is not part of the demo scope.)
 
 ### 3.4 Anchor contract: visibility = lifecycle (the core difference)
 

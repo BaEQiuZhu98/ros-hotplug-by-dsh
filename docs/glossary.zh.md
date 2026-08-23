@@ -1,6 +1,6 @@
 # 名词概念速查（glossary）
 
-> 集中记录本项目涉及的名词、特性、概念（从 `spatiotemporal-compositionality`、`README` 及各次设计讨论中抽出），供复习与面试速查。表格列为「名词 / 一句话含义 / 对应项目实现点」。
+> 集中记录本项目涉及的名词、特性、概念，供复习与面试速查。表格列为「名词 / 一句话含义 / 对应项目实现点」。
 
 ---
 
@@ -23,10 +23,12 @@
 | plugin / package / run | 版本时序：插件实例 / 不可变代码版本 / 一次激活尝试 | 多版本共存、回滚 |
 | 树外包（out-of-tree） | 持久、可发布的 npm 插件包（`dsh plugin add` 安装）；本项目里只作能力目录的**发布外壳** | 公开分发用，解包进能力仓库后走挂载服务 |
 | 能力仓库目录 | 能力的一等交付件：`repo/<能力>/<版本>/{host.js, manifest.json}`，零依赖 | `src/capabilities/repo/` |
-| 能力挂载服务 | host 常驻插件：mount = 校验 manifest + `ctx.plugin` 运行时挂载；unmount = `fiber.dispose()`；唯一写入口 = web 面板 RPC，**不注册 agent 工具** | `src/capabilities/mount_service/` |
-| 机器作用域 | 挂载服务挂载能力的作用域（机器本体层）：所有 agent 向下继承可见 | 热插拔的「空间锚点」 |
+| 能力挂载服务 | host 常驻插件：准入检查（sha256 + 规则表）+ 臂管理；实例落位由会话内臂管理器执行；唯一写入口 = web 面板 RPC，**不注册 agent 工具** | `src/capabilities/mount_service/` |
+| 臂作用域 | 每条机械臂一个子作用域（createScope(agentCtx, 'armA'/'armB')）：末端实例挂在这里，同名实例互不串台 | 热插拔的「空间锚点」 |
+| 臂管理器 | 会话内插件：预建两条臂作用域，执行实例的 ctx.plugin / fiber.dispose | `src/presets/robo` |
+| arm_status / take_object | agent 的两个工具：感知该臂是否可用（ready）/ 让该臂去拿东西（策略在实例内部） | 硬件差异屏蔽层 |
 | profile / preset | profile=应用层启动配置；preset=agent 层组成配置（目录） | `robo` preset 是「开箱即用的机器人 agent」 |
-| 工具（tool） | agent 可调用的能力，契约 = name/description/parameters/output/execute | 能力工具 grasp/suction/detect |
+| 工具（tool） | agent 可调用的能力，契约 = name/description/parameters/output/execute | agent 工具 arm_status/take_object；末端实例同名注册 manipulate |
 | host / client 半部 | 插件在进程内(Node)与浏览器里的两半 | web 面板插件的两半部 |
 | Slots 槽位 | 往 web GUI 注入 UI 的座位体系（如 `conversation.input.dock`） | 各 web 面板的挂载点 |
 | Client↔Host RPC | 动态插件 client 用 `host.call` 调 host 的 `harness.handle` 方法 | 面板按钮 → host 跑桥接脚本 |
@@ -37,14 +39,14 @@
 
 | 名词 | 一句话含义 | 对应项目实现点 |
 |---|---|---|
-| 能力（capability）/ 能力工具 | 一个末端执行器/传感器/技能，封装成一个 DSH 工具 | grasp / suction / detect |
-| 挂载 / 卸载 | 运行时注册/撤销一个能力插件（挂载服务：`ctx.plugin` / `fiber.dispose`，不重启） | `mount_service` 的 mount/unmount |
+| 能力（capability）/ 能力实例 | 末端硬件 + 驱动策略的完整单元（grasp = 夹取策略, suction = 吸附策略） | 带策略实例, 挂臂作用域 |
+| 挂载 / 卸载 | 臂管理器在臂作用域运行时注册/撤销能力实例（`ctx.plugin` / `fiber.dispose`，不重启） | `mount_service` + 臂管理器 |
 | manifest | 能力元数据 + 代码哈希 | 挂载前校验用 |
 | 挂载守卫（mount_guard） | 挂载前验哈希的闸（零信任） | `src/capabilities/mount_guard.py` |
 | 零信任 / 哈希校验 | 每次挂载都假设不可信，先验身再上机 | 篡改 manifest → 拒绝挂载 |
 | 签名（扩展） | 证明「确实出自某人」，= 对哈希加密 | 「云端签名/加密 → 设备验签/解密」的加分项 |
 | 多版本共存（主备） | 同一能力多个版本目录并存、互不覆盖 | repo 下 v1/v2/v3 目录 |
-| 换版切换 | 卸载旧能力 + 挂载新能力，工具名不变，agent 无感 | 挂载服务 unmount + mount |
+| 换版切换 | 该臂卸载旧实例 + 挂载新实例，arm_status/take_object 语义不变，agent 无感 | 臂作用域 unmount + mount |
 | 回滚 | 新版本激活失败则旧句柄保留，旧能力仍可用 | 注入坏版本 → 旧能力照常 |
 | 事件通知 | 能力增删广播，agent 订阅感知 | 观测 agent + `tools/change` |
 | 同名遮蔽 / 硬件差异屏蔽 | 同型能力同名、就近遮蔽、不串台 | 两个夹爪实例 |

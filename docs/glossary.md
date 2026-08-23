@@ -11,7 +11,7 @@
 | spatiotemporal compositionality | space (who sees whom) + time (who lives/dies when) + anchor contract | the core of the novelty claim |
 | plugin / plugin row | in DSH "everything is a plugin"; capabilities are declared as rows in a composition | a capability = one plugin row |
 | composition / cordis.yml | the file declaring plugin rows, defining what an agent/preset looks like | the production preset's `agent.cordis.yml` |
-| scope / layer | where capabilities sit: global → preset standing → per agent | mounting into the robot scope makes it agent-visible |
+| scope / layer | where capabilities sit: global → agent → arm → end-effector instance | arm scopes hold end-effector instances |
 | parent-chain inheritance | the registration view inherits downward | the agent sees preset capabilities |
 | nearest-wins (shadowing) | same-name: the nearest registration wins | same-type end-effectors shadow by name |
 | isolate realm | one private instance per mounted session; same-type services don't clash | two gripper/suction instances don't cross-talk |
@@ -20,10 +20,10 @@
 | Fiber | where a plugin's side effects hang; lives with the plugin | `ctx.on`/`ctx.effect` attach to the current Fiber |
 | anchor contract | the registration's context determines both visibility and lifecycle | rules out "visible but dead / alive but invisible" |
 | dynamic plugin | in-process temporary plugin (`cordis_define/run/update/stop/undefine`), gone on restart | demo capability tools & workflow panels |
-| plugin / package / run | version timeline: instance / immutable code version / activation attempt | multi-version, grayscale, rollback |
-| out-of-tree plugin | persistent, publishable npm plugin package (`dsh plugin add`) | the formal capability deliverable in `src/` |
+| plugin / package / run | version timeline: instance / immutable code version / activation attempt | multi-version, version swap, rollback |
+| out-of-tree plugin | persistent, publishable npm plugin package | an optional distribution shell for capability repo directories |
 | profile / preset | profile = app-level boot config; preset = agent-level composition (a directory) | the `robo` preset = out-of-the-box robot agent |
-| tool | an agent-callable capability; contract = name/description/parameters/output/execute | capability tools grasp/suction/detect |
+| tool | an agent-callable capability; contract = name/description/parameters/output/execute | agent tools arm_status/take_object; end-effector instances register same-name manipulate |
 | host / client halves | a plugin's in-process (Node) and browser halves | the web panel plugin's two halves |
 | Slots | seats for injecting UI into the web GUI (e.g. `conversation.input.dock`) | mounting points of the web panels |
 | Client↔Host RPC | client calls host via `host.call` on methods registered by `harness.handle` | panel button → host runs the bridge script |
@@ -34,14 +34,17 @@
 
 | Term | One-line meaning | Project implementation point |
 |---|---|---|
-| capability / capability tool | one end-effector/sensor/skill wrapped as a DSH tool | grasp / suction / detect |
-| mount / unmount | runtime register/deregister a capability plugin | `cordis_run` / `cordis_stop` |
+| capability / capability instance | the complete unit of end-effector hardware + driving strategy (grasp = grasp strategy, suction = suction strategy) | strategy-bearing instances on arm scopes |
+| arm scope | one sub-scope per arm (createScope(agentCtx, 'armA'/'armB')): end-effector instances mount here, same-name instances never cross-talk | the hot-plug space anchor |
+| arm manager | in-session plugin: pre-creates the two arm scopes and performs ctx.plugin / fiber.dispose | `src/presets/robo` |
+| arm_status / take_object | the agent's two tools: perceive whether an arm is ready / have the arm take the object (strategy inside the instance) | hardware-difference shielding |
+| mount / unmount | the arm manager registers/deregisters a capability instance on an arm scope at runtime (`ctx.plugin` / `fiber.dispose`) | mount service + arm manager |
 | manifest | capability metadata + code hash | used by the pre-mount check |
 | mount guard | the gate that verifies the hash before mounting (zero-trust) | `src/capabilities/mount_guard.py` |
 | zero-trust / hash check | treat every mount as untrusted; verify before mounting | tampered manifest → rejected |
 | signature (extension) | prove "truly from someone" = encrypt the hash | the "cloud sign/encrypt → device verify/decrypt" bonus |
-| multi-version coexistence (active/standby) | several immutable packages of one capability coexist | v1/v2/v3 never overwrite |
-| grayscale upgrade | `update` switches smoothly; the tool name is unchanged, agent-unaware | v1→v2 switch |
+| multi-version coexistence (active/standby) | several version directories of one capability coexist | arms can mount different versions |
+| version swap | unmount old instance + mount new; arm_status/take_object semantics unchanged, agent-unaware | arm-scope unmount + mount |
 | rollback | return to the previous version on failure | inject a bad version → `run` rolls back |
 | event notification | capability add/remove broadcasts; the agent subscribes | observation agent + `tools/change` |
 | same-name shadowing / hardware-difference shielding | same-type capabilities shadow by name, no cross-talk | two gripper instances |
@@ -74,7 +77,7 @@
 
 | Term | One-line meaning | Project implementation point |
 |---|---|---|
-| L0~L6 deliverables | repo / capability packages / preset / robot packages / bridge contract / eval / docs | design doc §10 |
+| L0~L6 deliverables | repo / capability (repo + mount system) / preset / robot packages / bridge contract / eval / docs | design doc §10 |
 | capability package (out-of-tree) | one end-effector/sensor = one installable npm package (tool+manifest+version) | `src/capabilities/*` |
 | agent preset (robo) | out-of-the-box robot agent config directory (composition+persona+skill) | `src/presets/robo` |
 | simulation bridge (sim_bridge) | robot-side Python package: subscribes bridge commands, drives MuJoCo, visualizes, feeds back | `src/ros2/sim_bridge` |

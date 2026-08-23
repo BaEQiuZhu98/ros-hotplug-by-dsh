@@ -22,6 +22,7 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 | `/tool_config` | 客户端 → sim_bridge | `std_msgs/String` | `"ARM:TOOL"` | 切换某臂末端执行器 |
 | `/ball_position` | 客户端 → sim_bridge | `std_msgs/String` | `"x,y"` | 设置小球 XY 位置 |
 | `/touch_command` | 客户端 → sim_bridge | `std_msgs/String` | `"A"` 或 `"B"` | 选臂触碰小球 |
+| `/reset_command` | 客户端 → sim_bridge | `std_msgs/String` | `"reset"` | 全部复位(关节归零/末端卸下/小球回初始) |
 | `/joint_state` | sim_bridge → 客户端 | `std_msgs/String` | JSON(见 §3) | 状态回传(10 Hz 反馈) |
 | `/capability_command` | 客户端 → 机器人侧 | `std_msgs/String` | `"grasp"` 或 `"suction"` | 激活能力(路径 A 单臂 server 用, v1.0 预留; sim_bridge 不订阅) |
 
@@ -59,7 +60,12 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 - `ball`: 小球当前 XY 位置(m).
 - 发布频率: 10 Hz.
 
-### 3.5 `/capability_command`(预留)
+### 3.5 `/reset_command`(契约 v1.1)
+
+- 格式: `"reset"`(载荷值不校验, 收到即复位).
+- 语义: 关节目标归零(平滑回伸直) + 末端全部卸下(灰) + 小球回 (0.5, 0).
+
+### 3.6 `/capability_command`(预留)
 
 - 路径 A(demo/13 单臂 `robot_server.py`)使用的旧话题, v1.0 保留定义供兼容;
   sim_bridge 不订阅, 新代码一律走 `/tool_config`.
@@ -71,6 +77,7 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 | `set_tool(arm, tool)` | `/tool_config` | `"ARM:TOOL"` | arm ∈ {A, B}; tool ∈ {grasp, suction, none} |
 | `set_ball(x, y)` | `/ball_position` | `"x,y"` | x/y 为有限数字 |
 | `touch(arm)` | `/touch_command` | `"A"`/`"B"` | arm ∈ {A, B} |
+| `reset()` | `/reset_command` | `"reset"` | - |
 | `query_capabilities()` | 订阅 `/joint_state` | - | 解析 §3.4 JSON, 返回能力集 |
 
 校验规则: 非法输入在 SDK 层直接拒绝, 返回 `{"ok": false, "error": "<原因>"}`,
@@ -87,4 +94,5 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 
 | 版本 | 日期 | 变更 |
 |---|---|---|
-| v1.0 | 2026-08 | 阶段 0 固化: 4 个话题 + /joint_state 反馈 + 薄 SDK; 预留 /capability_command |
+| v1.0 | 2026-08 | 初始契约: tool_config/ball_position/touch_command + /joint_state 反馈 + 薄 SDK; 预留 /capability_command |
+| v1.1 | 2026-08 | 新增 /reset_command(全部复位)与 SDK reset() |

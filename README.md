@@ -28,30 +28,22 @@ See [`docs/design.md`](docs/design.md) for the precise boundary.
 
 ---
 
-## Repository layout (current phase: demos only, no src / eval yet)
+## Repository layout
 
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # this file (zh / en)
 ├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log
+├── src/                            # source engineering (see src/README.zh.md)
+│   ├── capabilities/               #   capability repo (repo/) + mount service (mount_service/) + spec + mount guard
+│   ├── presets/robo/               #   robot task agent preset (persona + observer + arm manager + arm_status/take_object)
+│   ├── ros2/                       #   sim_bridge (two-arm sim bridge) + cpp_control (1kHz control)
+│   ├── bridge/                     #   bridge contract v1.1 + thin SDK
+│   └── sim/                        #   MuJoCo models & scenes
 ├── plugins/                        # archived dynamic Cordis plugins (next-demo / sync-docs)
 └── demo/                           # tutorial dirs (see demo/README.md)
-    ├── 00-dsh-quickstart/
-    ├── 01-what-is-agent/
-    ├── 02-ai-coding/
-    ├── 03-dsh-concepts/
-    ├── 04-dsh-plugin/
-    ├── 05-dsh-spatiotemporal/
-    ├── 06-ros2-mujoco-env/
-    ├── 07-rigid-transform/
-    ├── 08-kinematics/
-    ├── 09-trajectory-control/
-    ├── 10-ros2-basics/
-    ├── 11-cpp-control/
-    ├── 12-dsh-ros-bridge/
-    ├── 13-hotplug/                 # ★ flagship demo: capability hot-plugging (with reliability design)
-    ├── 14-vision/                  # optional
-    └── 15-imitation/               # optional
+    ├── 00-dsh-quickstart/ ... 15-imitation/
+    └── 13-hotplug/                 # ★ flagship demo: capability hot-plugging (with reliability design)
 ```
 
 ---
@@ -80,7 +72,7 @@ Mapping reliability engineering practice onto the hot-plug demo (`demo/13-hotplu
 |---|---|
 | Zero-trust pipeline (cloud sign/encrypt - device verify/decrypt) | Verify manifest / hash before mounting a capability; reject invalid ones |
 | Active/standby redundancy + multi-version coexistence | One capability supports multiple coexisting versions |
-| Grayscale upgrade + zero downtime | `update` grayscale-switches to a new version, agent-unaware |
+| Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware (grayscale not in demo scope) |
 | Second-level auto rollback | Auto-rollback to the previous version if activation fails |
 | Pub/sub event notification | Capability add/remove broadcasts events; agent perceives via subscription |
 | Hardware-difference shielding layer (decoupling) | Capability abstraction: same-type end-effectors shadow by name; upper layers unaware |
