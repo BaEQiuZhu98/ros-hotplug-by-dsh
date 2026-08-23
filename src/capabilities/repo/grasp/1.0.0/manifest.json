@@ -1,0 +1,9 @@
+{
+  "grasp": {
+    "name": "grasp",
+    "version": "1.0.0",
+    "description": "夹爪能力: 把指定臂末端切到夹爪并触碰小球",
+    "tool": "host.js",
+    "sha256": "93f828cdbe53f31bc82aeafe0e82e3d83de2af18648d8e7d97e19464fe726618"
+  }
+}

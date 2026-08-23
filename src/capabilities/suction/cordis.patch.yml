@@ -1,9 +1,0 @@
-# capability-suction 组合补丁: 把本包作为一行 entry 挂进组合树.
-# 安装(dsh plugin add)后, 包名进入 profile 的 dsh.profile.bundles, 本层即生效.
-- insert:
-  - id: capability-suction
-    name: '@ros-hotplug/dsh-plugin-suction'
-    config:
-      # 安装方按环境填写: 仓库根(找 bridge_client.py)与 venv python(有 roslibpy).
-      workdir: /root/my-project/ros-hotplug-by-dsh
-      python: /root/venvs/robo/bin/python3

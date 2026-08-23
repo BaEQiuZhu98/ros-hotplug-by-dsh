@@ -100,6 +100,10 @@ class Bridge:
             return {'ok': False, 'error': '非法臂 "%s", 只能是 A 或 B' % arm}
         return self._publish('/touch_command', arm)
 
+    def reset(self):
+        """全部复位(契约 v1.1): 关节归零 + 末端全部卸下 + 小球回初始位置."""
+        return self._publish('/reset_command', 'reset')
+
     def query_capabilities(self, wait=2.0):
         """订阅 /joint_state, 等到最新一条回传后返回能力集.
 
@@ -136,11 +140,11 @@ class Bridge:
 if __name__ == '__main__':
     # CLI 入口(给能力包 host.js 等外部调用方用): 一行命令 = 一次连接 + 一次调用,
     # 结果以 JSON 打印(机器可读), 退出码 0 = ok, 1 = 失败.
-    # 用法: bridge_client.py set_tool A grasp | set_ball x y | touch A | query_capabilities
+    # 用法: bridge_client.py set_tool A grasp | set_ball x y | touch A | reset | query_capabilities
     import sys as _sys
 
     if len(_sys.argv) < 2:
-        print('用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|query_capabilities>')
+        print('用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|reset|query_capabilities>')
         _sys.exit(1)
     method = _sys.argv[1]
     bridge = Bridge()
@@ -155,6 +159,8 @@ if __name__ == '__main__':
             result = bridge.set_ball(_sys.argv[2], _sys.argv[3])
         elif method == 'touch' and len(_sys.argv) >= 3:
             result = bridge.touch(_sys.argv[2])
+        elif method == 'reset':
+            result = bridge.reset()
         elif method == 'query_capabilities':
             result = bridge.query_capabilities()
         else:

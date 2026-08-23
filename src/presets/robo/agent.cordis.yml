@@ -1,12 +1,13 @@
-# robo agent preset 组合(阶段 2): 机器人任务 agent.
+# robo agent preset 组合(阶段 2, 架构 v2): 机器人任务 agent.
 #
 # 组成:
 #   1. persona: 「感知末端状态, 自适应选策略, 不做低层控制」(设计 §7.2).
 #   2. robo-observer(preset 自带文件, 相对路径): 订阅 tools/change + 注册 capability_status 工具(设计 §7.4 观测能力).
-#   3. 能力包行(树外包, 绝对路径): grasp/suction 末端能力, 挂到本 preset 的作用域(作用域遮蔽全局).
-#   4. skills/: 机器人能力自适应技能, 随 preset 走.
+#   3. skills/: 机器人能力自适应技能, 随 preset 走.
 #
-# 安装: 用 install.sh 复制本目录到 $DSH_HOME/.agent-presets/robo 并替换能力包路径占位.
+# 注意: 本组合**不含能力包行**(架构 v2) - 末端装配是机器事实, 由能力挂载服务负责
+# (唯一写者 = 人, 经 web 面板), preset 只感知不装配(设计 §10.4/§7.6).
+# 安装: install.sh 复制本目录到 $DSH_HOME/.agent-presets/robo.
 
 # ── persona ─────────────────────────────────────────────────────────────────
 
@@ -54,21 +55,8 @@
     workdir: /root/my-project/ros-hotplug-by-dsh
     python: /root/venvs/robo/bin/python3
 
-# ── 能力包行(树外包, 热插拔载体) ────────────────────────────────────────────
+# ── 能力装配(架构 v2): 不在此处 ─────────────────────────────────────────────
 #
-# name 是绝对路径(安装方用 install.sh 把 __CAPABILITY_BASE__ 替换为 profile
-# 的 node_modules 根). 能力包只注册工具, 不发布服务, 按组合规则不需要 isolate
-# realm; 挂在 preset 作用域 = 只对本会话的 agent 可见, 且遮蔽全局同名注册.
-# 卸载/替换能力 = 删除/改行后重启会话(或 install.sh 重新生成).
-
-- id: capability-grasp
-  name: '__CAPABILITY_BASE__/@ros-hotplug/dsh-plugin-grasp/src/host.js'
-  config:
-    workdir: /root/my-project/ros-hotplug-by-dsh
-    python: /root/venvs/robo/bin/python3
-
-- id: capability-suction
-  name: '__CAPABILITY_BASE__/@ros-hotplug/dsh-plugin-suction/src/host.js'
-  config:
-    workdir: /root/my-project/ros-hotplug-by-dsh
-    python: /root/venvs/robo/bin/python3
+# 本 preset 不含能力包行: 末端装配由能力挂载服务负责(host 常驻, 机器作用域,
+# 运行时挂载/卸载, 不重启; 唯一写者 = 人, 经 web 面板). 本 preset 的 agent
+# 通过工具表/capability_status/tools/change 感知挂载结果(设计 §7.6).

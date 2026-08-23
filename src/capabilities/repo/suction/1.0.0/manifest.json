@@ -3,7 +3,7 @@
     "name": "suction",
     "version": "1.0.0",
     "description": "吸盘能力: 把指定臂末端切到吸盘并触碰小球",
-    "tool": "src/host.js",
-    "sha256": "f991c82aeac0da45e77a752937fa7c04bd699e56b6de7dc641de010c10b11c3f"
+    "tool": "host.js",
+    "sha256": "e444bc6552eabf9a8029085f8c6d6291ec5fdffab770d24dae7dc8b854a19deb"
   }
 }

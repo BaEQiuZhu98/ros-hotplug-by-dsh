@@ -106,11 +106,22 @@ class TwoArmServer(Node):
         self.create_subscription(String, 'tool_config', self.on_tool_config, 10)
         self.create_subscription(String, 'touch_command', self.on_touch, 10)
         self.create_subscription(String, 'ball_position', self.on_ball_position, 10)
+        self.create_subscription(String, 'reset_command', self.on_reset, 10)
 
         self.state_pub = self.create_publisher(String, 'joint_state', 10)
         self.create_timer(1.0 / JOINT_STATE_RATE, self.publish_joint_state)
 
         self.get_logger().info('two_arm_server 已就绪')
+
+    def on_reset(self, msg):
+        # 全部复位(契约 v1.1): 关节目标归零(平滑回伸直), 末端全部卸下(灰), 小球回初始位置.
+        self.targets = {'A': np.array([0.0, 0.0]), 'B': np.array([0.0, 0.0])}
+        for arm in ARMS:
+            self.tools[arm] = 'none'
+            self.model.geom_rgba[self.tool_ids[arm]] = COLORS['none']
+        self.ball = np.array([0.5, 0.0])
+        self.data.mocap_pos[self.ball_mocap] = [0.5, 0.0, 0.5]
+        self.get_logger().info('全部复位: 关节归零, 末端卸下, 小球回 (0.5, 0)')
 
     def on_tool_config(self, msg):
         # 载荷格式 "A:grasp" / "B:suction" / "A:none".
