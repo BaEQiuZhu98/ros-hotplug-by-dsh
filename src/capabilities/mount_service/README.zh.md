@@ -14,15 +14,16 @@
 ## 服务契约
 
 ```text
-mount(cap, version, {arm})  准入检查(sha256 + 规则表) -> 动态 import 能力插件
-                            -> 转会话内臂管理器在 armX 作用域 ctx.plugin -> {ok, arm, cap, version}
-unmount(arm)                臂管理器在 armX 作用域 fiber.dispose(只回收本臂实例)
-list()                      {repo: [{cap, version}...], mounted: [{arm, cap, version}...]}
+registerArms({A: ctx, B: ctx})  臂管理器(会话内)注册臂上下文(作用域); 多会话各自追加
+mount(cap, version, {arm})      准入检查(sha256 + 规则表, 先于任何卸载) -> 动态 import 能力插件
+                                -> 在 arm 对应臂上下文上 ctx.plugin -> {ok, arm, cap, version}
+unmount(arm)                    该臂全部上下文上的实例 fiber.dispose(只回收本臂)
+list()                          {repo: [{cap, version}...], mounted: [{arm, cap, version}...]}
 ```
 
-- **臂间独立**: 不同臂可挂同名能力(A/B 各挂 grasp), 同名 manipulate 实例按作用域隔离, 互不串台.
+- **臂间独立**: 不同臂可挂同名能力(A/B 各挂 grasp), 同名 manipulate 实例按臂作用域隔离, 互不串台.
 - **同臂防重**: 同一条臂重复挂同一 cap@version -> 拒绝; 同臂挂别的末端 -> 先卸载再挂(替换).
-- **失败回滚**: 新实例激活失败则旧句柄保留, 旧末端照常可用.
+- **失败回滚**: 准入失败不动现有挂载; 新实例激活失败则恢复旧实例(旧末端照常可用).
 - 挂/卸触发 `tools/change` 广播, observer 订阅感知.
 
 ## 面板职责(与 agent 分工)

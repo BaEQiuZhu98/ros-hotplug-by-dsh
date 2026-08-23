@@ -1,0 +1,8 @@
+{
+  "name": "@ros-hotplug/dsh-plugin-arm-manager",
+  "version": "1.0.0",
+  "description": "In-session arm manager: pre-creates armA/armB scopes and provides arm_status/take_object agent tools",
+  "type": "module",
+  "main": "src/index.js",
+  "license": "MIT"
+}

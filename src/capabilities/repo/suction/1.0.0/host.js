@@ -1,12 +1,20 @@
-// suction 能力 v1.0.0 - 与 grasp 同构(架构 v2 仓库目录形态, 零依赖).
+// suction 能力 v1.0.0 - 吸盘末端: 吸附策略实例(架构 §7/§10.3).
+//
+// 挂载到某条臂作用域后, 注册同名 manipulate 工具(与吸盘实例同名, 靠臂作用域隔离).
+// execute 实现夹取策略: 感知物理末端匹配 -> 执行策略步 -> 状态校验; **绝不改变装配**
+// (装配末端是面板/人的职责).
+// 零依赖: 不 import 任何包, 只用注入的服务与手写 Tool 契约.
 export const name = 'capability-suction'
 export const inject = ['tools', 'shell']
 
 export function apply(ctx, config = {}) {
+  // config 由挂载体系注入: arm = 本实例所属机械臂, workdir/python = 环境.
+  const arm = config.arm ?? 'A'
   const workdir = config.workdir ?? '.'
   const python = config.python ?? 'python3'
   const BRIDGE = 'src/bridge/bridge_client.py'
 
+  // 跑一条 SDK CLI 命令, 解析 JSON 输出. 返回 {ok, error, parsed}.
   async function runCli(method, args) {
     const cmd = [python, BRIDGE, method, ...args].join(' ')
     const spec = ctx.shell.resolve({ command: cmd, workdir, timeoutMs: 15000 })
@@ -24,37 +32,41 @@ export function apply(ctx, config = {}) {
     }
   }
 
+  // 读 sim_bridge 状态回传, 返回 {ok, tools, ball} 或错误.
+  async function perceive() {
+    const caps = await runCli('query_capabilities', [])
+    if (!caps.ok) return { ok: false, error: caps.error }
+    const c = caps.parsed && caps.parsed.caps
+    return { ok: true, tools: (c && c.tools) || {}, ball: (c && c.ball) || null }
+  }
+
+  // 同名实例: 每条臂一个 manipulate, 臂作用域隔离(设计 §7.2).
   const unregister = ctx.tools.register({
-    name: 'suction',
-    description: '让已挂吸盘的臂去触碰小球. 执行前先感知该臂物理末端(经 SDK 读 sim_bridge 状态回传), 不是吸盘则报错、不做任何装配(装配末端是面板/人的职责). 参数 arm 选 A 或 B(默认 A).',
-    parameters: {
-      type: 'object',
-      properties: {
-        arm: { type: 'string', enum: ['A', 'B'], description: '要操作的机械臂, A 或 B.' },
-      },
-      required: [],
-    },
+    name: 'manipulate',
+    description: '该臂当前末端的操控实例(策略在内部: 感知匹配 -> 执行 -> 校验).',
+    parameters: { type: 'object', properties: {}, required: [] },
     output: {
       schema: { type: 'string' },
       render(_args, value) { return [{ type: 'text', text: value }] },
     },
-    async execute(args) {
-      const arm = (args && args.arm) || 'A'
-      // 先感知物理末端(经 SDK 读 sim_bridge 回传), 不匹配则报错、不做任何装配(装配是面板/人的职责).
-      const caps = await runCli('query_capabilities', [])
-      if (!caps.ok) return '感知失败: ' + caps.error
-      const tools = caps.parsed && caps.parsed.caps && caps.parsed.caps.tools
-      const cur = tools ? tools[arm] : undefined
-      if (cur !== 'suction') {
-        return '臂 ' + arm + ' 当前末端是 "' + (cur || 'none') + '", 不是吸盘, 无法抓取(请先在面板给该臂挂吸盘)'
+    async execute() {
+      // 吸附策略第 1 步: 感知物理末端, 必须已是吸盘(装配是面板/人的职责, 实例不改变装配).
+      const seen = await perceive()
+      if (!seen.ok) return '臂 ' + arm + ' 夹取失败: 感知不到状态(' + seen.error + ')'
+      if (seen.tools[arm] !== 'suction') {
+        return '臂 ' + arm + ' 当前末端是 "' + (seen.tools[arm] || 'none') + '", 不是吸盘, 无法吸附(请先在面板给该臂挂吸盘)'
       }
+      // 吸附策略第 2 步: 执行(对准 + 吸附, 由 sim_bridge 完成 IK 与触球).
       const touch = await runCli('touch', [arm])
-      if (!touch.ok) return 'suction 失败: ' + touch.error
-      return '臂 ' + arm + ' 吸盘已去触碰小球 (touch ok)'
+      if (!touch.ok) return '臂 ' + arm + ' 吸附失败: ' + touch.error
+      // 吸附策略第 3 步: 状态校验(回传确认末端仍为吸盘).
+      const after = await perceive()
+      if (!after.ok) return '臂 ' + arm + ' 吸附完成, 但状态校验不可用(' + after.error + ')'
+      return '臂 ' + arm + ' 吸附完成: 末端 ' + after.tools[arm] + ', 小球位置 ' + JSON.stringify(after.ball) + ' (touch ok)'
     },
   })
 
-  console.log('[capability-suction] suction 工具已注册')
+  console.log('[capability-suction] 臂 %s 挂载吸附策略实例(manipulate)', arm)
 
   return () => {
     unregister()

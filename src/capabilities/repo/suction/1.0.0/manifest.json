@@ -4,6 +4,6 @@
     "version": "1.0.0",
     "description": "吸盘能力: 把指定臂末端切到吸盘并触碰小球",
     "tool": "host.js",
-    "sha256": "e444bc6552eabf9a8029085f8c6d6291ec5fdffab770d24dae7dc8b854a19deb"
+    "sha256": "204a471dbb81677ae653bb499cafca122b97bc1a96bf6a88b0ad0511bab00db1"
   }
 }

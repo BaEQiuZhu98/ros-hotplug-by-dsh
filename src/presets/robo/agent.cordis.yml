@@ -1,13 +1,14 @@
-# robo agent preset 组合(阶段 2, 架构 v2): 机器人任务 agent.
+# robo agent preset 组合: 机器人任务 agent(设计 §10.4).
 #
 # 组成:
-#   1. persona: 「感知末端状态, 自适应选策略, 不做低层控制」(设计 §7.2).
-#   2. robo-observer(preset 自带文件, 相对路径): 订阅 tools/change + 注册 capability_status 工具(设计 §7.4 观测能力).
-#   3. skills/: 机器人能力自适应技能, 随 preset 走.
+#   1. persona: 「感知末端状态(仅 ready), 自适应决策, 不做低层控制, 不感知末端型号」.
+#   2. 臂管理器(robo-arm-manager, 树外包包形态): 预建 armA/armB 作用域 + arm_status/take_object 工具.
+#   3. robo-observer(preset 自带文件, 相对路径): 订阅 tools/change 汇报能力集.
+#   4. skills/: 机器人能力自适应技能, 随 preset 走.
 #
-# 注意: 本组合**不含能力包行**(架构 v2) - 末端装配是机器事实, 由能力挂载服务负责
-# (唯一写者 = 人, 经 web 面板), preset 只感知不装配(设计 §10.4/§7.6).
-# 安装: install.sh 复制本目录到 $DSH_HOME/.agent-presets/robo.
+# 本组合不含能力包行: 末端装配由能力挂载体系负责(面板 -> 挂载服务 -> 臂作用域), preset 只感知与执行.
+# 安装: install.sh 复制本目录到 $DSH_HOME/.agent-presets/robo, 并把臂管理器包装进 profile
+# 的 node_modules, 同时替换臂管理器行的 __ARM_MANAGER__ 占位.
 
 # ── persona ─────────────────────────────────────────────────────────────────
 
@@ -15,15 +16,14 @@
   name: '@deepseek-ai/dsh-persona'
   config:
     text: |-
-      你是机器人任务 agent(robo), 运行在 DeepSeek Harness, 工作目录 {{cwd}}. 你面向具身机器人, 负责感知与策略, 不做低层控制.
+      你是机器人任务 agent(robo), 运行在 DeepSeek Harness, 工作目录 {{cwd}}. 你面向具身机器人, 负责感知与决策, 不做低层控制.
 
-      核心原则: 感知末端状态, 自适应选策略, 不做低层控制.
-      - 你不控制"自己具备什么末端": 末端执行器由人/平台/运维在运行时热插拔(挂载/卸载能力包), 这是外部事实, 不是你的决定.
-      - 每次执行前先感知: 调用 capability_status 工具. 判断"是否有末端能力"以 mounted 为准(你的工具表里有 grasp 工具 = 夹爪已挂载, 有 suction 工具 = 吸盘已挂载); physical.tools 是机器人物理末端状态(执行切换后的结果), 挂载初期可能还是 none, 调用能力工具后才会变成对应末端.
-      - 对同一句命令自适应选策略: 例如"抓小球" - mounted 有 grasp 就走夹取(调 grasp), mounted 有 suction 就走吸附(调 suction), 都没有则明确报告"当前没有末端执行器, 无法抓取", 绝不假装成功.
-      - 热插拔随时可能发生: 每次执行都重新感知, 不缓存旧的末端状态; 收到能力变化信号时更新你的感知.
-      - 不做低层控制: 你不直接发关节角、话题或碰 rosbridge, 只调用能力工具与状态查询工具; 低层控制属于 sim_bridge/cpp_control.
-      - 汇报时说明你感知到了什么、选择了什么策略、结果如何.
+      核心原则: 感知末端状态, 自适应决策, 不做低层控制, 不感知末端型号.
+      - 你不控制也不感知末端型号: 末端执行器由人在运行时热插拔(经 web 面板), 是外部事实; 你只通过 arm_status 感知某条臂是否具备可用末端(ready), 不知道也无需知道是夹爪还是吸盘.
+      - 每次执行前先感知: 调 arm_status(arm). ready=true 才调 take_object(arm) 执行; ready=false 按返回的 reason 如实报告, 绝不假装成功.
+      - 对同一句命令自适应: 同一句「抓小球」, 末端换型后实例内部自动换策略, 你的决策面始终只有 ready 一个布尔.
+      - 不做低层控制: 只调 arm_status 与 take_object; 挂载/卸载末端是面板(人)的职责, 你没有该权限, 也没有该工具.
+      - 汇报时说明: 感知到什么(哪条臂 ready 与否)、做了什么(take_object 结果).
 
 # ── agent 指令压缩 ──────────────────────────────────────────────────────────
 
@@ -46,17 +46,16 @@
     customSkillDirs:
       - !!js "process.getBuiltinModule('node:url').fileURLToPath(new URL('skills/', baseUrl))"
 
-# ── 观测插件(设计 §7.4): 订阅 tools/change + capability_status 工具 ─────────
+# ── 臂管理器(设计 §7.1 层 1/2, 树外包包形态) ───────────────────────────────
 
-- id: robo-observer
-  name: './src/observer.js'
+- id: robo-arm-manager
+  name: '__ARM_MANAGER__/src/index.js'
   config:
     # 仓库根(找 bridge_client.py)与 venv python(有 roslibpy).
     workdir: /root/my-project/ros-hotplug-by-dsh
     python: /root/venvs/robo/bin/python3
 
-# ── 能力装配(架构 v2): 不在此处 ─────────────────────────────────────────────
-#
-# 本 preset 不含能力包行: 末端装配由能力挂载服务负责(host 常驻, 机器作用域,
-# 运行时挂载/卸载, 不重启; 唯一写者 = 人, 经 web 面板). 本 preset 的 agent
-# 通过工具表/capability_status/tools/change 感知挂载结果(设计 §7.6).
+# ── 观测插件(设计 §7.6): 订阅 tools/change 汇报能力集 ───────────────────────
+
+- id: robo-observer
+  name: './src/observer.js'

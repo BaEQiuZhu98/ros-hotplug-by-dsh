@@ -4,6 +4,6 @@
     "version": "1.1.0",
     "description": "夹爪能力 v2: 返回文本带 [v2] 标记(换版/回滚验证用)",
     "tool": "host.js",
-    "sha256": "9a03a647eac0f288bc4623b5f99cd2cf1eed90e26c16e0d45d3064073d07459a"
+    "sha256": "07d0291ab15c8e9320d418644fb6e6812d813016a030315b38ba49f4051528b7"
   }
 }

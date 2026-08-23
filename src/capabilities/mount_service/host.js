@@ -1,18 +1,17 @@
-// capability-mount-service - 能力挂载服务(架构 v2 热插拔本体).
+// capability-mount-service - 能力挂载服务(设计 §7.1 层 0 / §10.3).
 //
 // host 常驻插件(组合挂载的真实插件, 非动态沙箱: 动态沙箱 ctx 隐藏 ctx.plugin/fiber 等框架内部).
-// 提供 'capabilityMount' 服务, 供 web 面板(人的唯一写入口)经 RPC 调用; 不注册任何 agent 工具.
+// 职责: 准入检查(sha256 + 规则表) + 臂管理(按臂记录); 末端实例的运行时挂/卸在会话内
+// 臂管理器注册的**臂上下文(作用域)**上执行. 提供 'capabilityMount' 服务, 供 web 面板
+// (人的唯一写入口)经 RPC 调用; 不注册任何 agent 工具.
 //
-//   mount(cap, version, {arm})  1) manifest sha256 校验(零信任) 2) 动态 import 能力 host.js
-//                                3) ctx.plugin 挂到机器作用域(工具立即可见, 不重启) 4) 记录臂句柄
-//   unmount(arm)                该臂卸载; 该能力已无任何臂引用时 dispose 工具注册(精确回收)
-//   list()                      仓库能力清单 + 各臂已挂载清单
+//   registerArms({A: ctx, B: ctx})  臂管理器(会话内)注册臂上下文; 多会话注册各自追加
+//   mount(cap, version, {arm})      准入检查 -> 动态 import -> 在 arm 对应上下文中 ctx.plugin
+//                                   -> 同臂防重(同 cap@version 拒绝), 同臂换挂先卸载(替换)
+//   unmount(arm)                    该臂全部上下文上的实例 fiber.dispose(只回收本臂)
+//   list()                          {repo, mounted: [{arm, cap, version}]}
 //
-// 臂间独立 / 同名隔离(与用户确认的语义):
-//   - 不同臂可以挂同名能力(如 A/B 各挂 grasp), 互不冲突: 工具全局只注册一次(机器作用域),
-//     挂载服务按臂记录引用; 物理末端由 sim_bridge 按臂独立维护(tools: {A, B}).
-//   - 同一条臂重复挂同一 cap@version -> 拒绝; 同臂挂别的工具 -> 先卸载再挂(替换).
-//   - 同名工具全局注册唯一: 同 cap 多版本并存时, 工具实现取先挂载的版本(DSH 工具名唯一性的自然结果).
+// 臂间独立: 不同臂可挂同名能力(实例同名 manipulate, 靠臂作用域隔离, 互不串台).
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -26,9 +25,9 @@ export function apply(ctx, config = {}) {
   const workdir = config.workdir ?? '.'
   const python = config.python ?? 'python3'
 
-  // cap -> {dispose, refs: Set<arm>}   工具注册全局唯一, 多臂共享.
-  const registry = new Map()
-  // arm -> {cap, version}              该臂当前挂载.
+  // arm -> [{ctx, ...}]  臂管理器注册的臂上下文(每会话一套, 追加).
+  const armContexts = { A: [], B: [] }
+  // arm -> {cap, version, fibers: [{dispose}]}  该臂当前挂载.
   const armsByArm = new Map()
 
   function sha256(file) {
@@ -49,7 +48,7 @@ export function apply(ctx, config = {}) {
     return out.sort()
   }
 
-  // 校验 manifest + 动态加载能力插件(不注册), 失败返回 {ok:false, error}.
+  // 准入: sha256 与 manifest 比对 + 动态加载能力插件(不注册).
   async function loadPlugin(cap, version) {
     const dir = join(repo, cap, version)
     const hostFile = join(dir, 'host.js')
@@ -79,16 +78,44 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  // 把该臂的旧挂载卸下(若该能力已无任何臂引用, 同步回收工具注册).
+  // 在单个臂上下文上挂载实例, 等待激活确认. 返回 {ok, dispose} 或 {ok:false, error}.
+  async function mountOnContext(targetCtx, plugin, arm) {
+    let handle
+    try {
+      handle = targetCtx.plugin(plugin, { workdir, python, arm })
+    } catch (e) {
+      return { ok: false, error: 'ctx.plugin 挂载失败: ' + e.message }
+    }
+    const dispose = typeof handle === 'function' ? handle : () => handle.dispose()
+    try {
+      if (typeof handle.await === 'function') await handle.await()
+      else await new Promise((resolveWait) => setTimeout(resolveWait, 50))
+    } catch (e) {
+      try {
+        dispose()
+      } catch (err) {
+        // 回收失败不掩盖原始错误.
+      }
+      return { ok: false, error: '挂载激活失败: ' + (e && e.message) }
+    }
+    return { ok: true, dispose }
+  }
+
+  function registerArms(arms) {
+    for (const arm of ['A', 'B']) {
+      if (arms[arm] !== undefined && arms[arm] !== null) armContexts[arm].push(arms[arm])
+    }
+    console.log('[cap-mount-service] 臂上下文注册: A=%d 套, B=%d 套', armContexts.A.length, armContexts.B.length)
+  }
+
   async function unmount(arm) {
     const cur = armsByArm.get(arm)
-    if (!cur) return { ok: false, error: '臂 ' + arm + ' 没有挂载工具' }
-    const entry = registry.get(cur.cap)
-    if (entry !== undefined) {
-      entry.refs.delete(arm)
-      if (entry.refs.size === 0) {
-        await entry.dispose()
-        registry.delete(cur.cap)
+    if (!cur) return { ok: false, error: '臂 ' + arm + ' 没有挂载末端' }
+    for (const f of cur.fibers) {
+      try {
+        await f.dispose()
+      } catch (e) {
+        // 尽力回收.
       }
     }
     armsByArm.delete(arm)
@@ -97,44 +124,48 @@ export function apply(ctx, config = {}) {
 
   async function mount(cap, version, options = {}) {
     const arm = options.arm
-    if (arm !== undefined) {
-      const cur = armsByArm.get(arm)
-      if (cur !== undefined && cur.cap === cap && cur.version === version) {
-        return { ok: false, error: '臂 ' + arm + ' 已挂载 ' + cap + '@' + version + '(同臂重复挂载拒绝)' }
-      }
-      // 同臂挂别的工具: 先卸载旧挂载(替换).
-      if (cur !== undefined) await unmount(arm)
+    if (arm !== 'A' && arm !== 'B') return { ok: false, error: '非法机械臂: ' + (arm || '(未指定)') }
+    const cur = armsByArm.get(arm)
+    if (cur !== undefined && cur.cap === cap && cur.version === version) {
+      return { ok: false, error: '臂 ' + arm + ' 已挂载 ' + cap + '@' + version + '(同臂重复挂载拒绝)' }
     }
+    // 准入先于任何卸载: 校验失败时旧挂载原封不动(失败回滚语义).
     const loaded = await loadPlugin(cap, version)
     if (!loaded.ok) return loaded
-    // 工具注册全局唯一(机器作用域): 该能力首次挂载时 ctx.plugin, 后续臂共享注册.
-    let entry = registry.get(cap)
-    if (entry === undefined) {
-      let handle
-      try {
-        handle = ctx.plugin(loaded.plugin, { workdir, python })
-      } catch (e) {
-        return { ok: false, error: 'ctx.plugin 挂载失败: ' + e.message }
-      }
-      const dispose = typeof handle === 'function' ? handle : () => handle.dispose()
-      try {
-        if (typeof handle.await === 'function') await handle.await()
-        else await new Promise((resolveWait) => setTimeout(resolveWait, 50))
-      } catch (e) {
-        try {
-          dispose()
-        } catch (err) {
-          // 回收失败不掩盖原始错误.
+    const contexts = armContexts[arm]
+    if (contexts.length === 0) {
+      return { ok: false, error: '臂 ' + arm + ' 没有臂上下文(请先创建「机器人任务」会话)' }
+    }
+    // 同臂换挂: 先卸载旧实例, 新实例挂载失败则尽力恢复旧实例(旧末端仍在).
+    if (cur !== undefined) await unmount(arm)
+    // 在全部臂上下文(各会话的该臂作用域)上挂载同名实例; 不同臂上下文同名实例互不冲突.
+    const fibers = []
+    for (const targetCtx of contexts) {
+      const r = await mountOnContext(targetCtx, loaded.plugin, arm)
+      if (!r.ok) {
+        for (const f of fibers) {
+          try {
+            await f.dispose()
+          } catch (e) {
+            // 尽力回收.
+          }
         }
-        return { ok: false, error: '挂载激活失败: ' + (e && e.message) }
+        // 恢复旧实例(尽力而为), 保证失败回滚: 旧末端不受新挂载失败影响.
+        if (cur !== undefined) {
+          const restored = []
+          for (const targetCtx of contexts) {
+            const rr = await mountOnContext(targetCtx, cur.plugin, arm)
+            if (rr.ok) restored.push({ dispose: rr.dispose })
+          }
+          if (restored.length > 0) {
+            armsByArm.set(arm, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
+          }
+        }
+        return { ok: false, error: r.error, restored: cur !== undefined }
       }
-      entry = { dispose, refs: new Set() }
-      registry.set(cap, entry)
+      fibers.push({ dispose: r.dispose })
     }
-    if (arm !== undefined) {
-      entry.refs.add(arm)
-      armsByArm.set(arm, { cap, version })
-    }
+    armsByArm.set(arm, { cap, version, fibers, plugin: loaded.plugin })
     return { ok: true, arm, cap, version }
   }
 
@@ -145,19 +176,22 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  ctx.provide('capabilityMount', { mount, unmount, list })
+  ctx.provide('capabilityMount', { registerArms, mount, unmount, list })
   console.log('[cap-mount-service] 已就绪, repo=%s', repo)
 
-  // 插件 dispose: 回收全部挂载(工具注册全部注销).
+  // 插件 dispose: 回收全部挂载.
   return () => {
-    for (const [, entry] of registry) {
-      try {
-        entry.dispose()
-      } catch (e) {
-        // 尽力回收.
+    for (const [, cur] of armsByArm) {
+      for (const f of cur.fibers) {
+        try {
+          f.dispose()
+        } catch (e) {
+          // 尽力回收.
+        }
       }
     }
-    registry.clear()
     armsByArm.clear()
+    armContexts.A.length = 0
+    armContexts.B.length = 0
   }
 }

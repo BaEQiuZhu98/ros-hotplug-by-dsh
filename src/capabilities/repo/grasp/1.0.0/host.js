@@ -1,13 +1,15 @@
-// grasp 能力 v1.0.0 - 能力仓库目录形态(架构 v2), 由挂载服务动态加载.
+// grasp 能力 v1.0.0 - 夹爪末端: 夹取策略实例(架构 §7/§10.3).
 //
-// 零依赖: 不 import 任何包(仓库目录不在 node_modules 解析链上, 且自包含利于分发),
-// 只用注入的服务(tools/shell)与手写 Tool 契约.
-// 规范见 src/capabilities/capability-spec.md; 挂载前挂载服务会对本文件做 sha256 校验.
+// 挂载到某条臂作用域后, 注册同名 manipulate 工具(与吸盘实例同名, 靠臂作用域隔离).
+// execute 实现夹取策略: 感知物理末端匹配 -> 执行策略步 -> 状态校验; **绝不改变装配**
+// (装配末端是面板/人的职责).
+// 零依赖: 不 import 任何包, 只用注入的服务与手写 Tool 契约.
 export const name = 'capability-grasp'
 export const inject = ['tools', 'shell']
 
 export function apply(ctx, config = {}) {
-  // config 由挂载服务注入: 仓库根(找 bridge_client.py)与 venv python(有 roslibpy).
+  // config 由挂载体系注入: arm = 本实例所属机械臂, workdir/python = 环境.
+  const arm = config.arm ?? 'A'
   const workdir = config.workdir ?? '.'
   const python = config.python ?? 'python3'
   const BRIDGE = 'src/bridge/bridge_client.py'
@@ -30,39 +32,41 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  // 注册能力工具. 返回的 disposer 随插件 dispose 精确回收(卸载 = 工具消失).
+  // 读 sim_bridge 状态回传, 返回 {ok, tools, ball} 或错误.
+  async function perceive() {
+    const caps = await runCli('query_capabilities', [])
+    if (!caps.ok) return { ok: false, error: caps.error }
+    const c = caps.parsed && caps.parsed.caps
+    return { ok: true, tools: (c && c.tools) || {}, ball: (c && c.ball) || null }
+  }
+
+  // 同名实例: 每条臂一个 manipulate, 臂作用域隔离(设计 §7.2).
   const unregister = ctx.tools.register({
-    name: 'grasp',
-    description: '让已挂夹爪的臂去触碰小球. 执行前先感知该臂物理末端(经 SDK 读 sim_bridge 状态回传), 不是夹爪则报错、不做任何装配(装配末端是面板/人的职责). 参数 arm 选 A 或 B(默认 A).',
-    parameters: {
-      type: 'object',
-      properties: {
-        arm: { type: 'string', enum: ['A', 'B'], description: '要操作的机械臂, A 或 B.' },
-      },
-      required: [],
-    },
+    name: 'manipulate',
+    description: '该臂当前末端的操控实例(策略在内部: 感知匹配 -> 执行 -> 校验).',
+    parameters: { type: 'object', properties: {}, required: [] },
     output: {
       schema: { type: 'string' },
       render(_args, value) { return [{ type: 'text', text: value }] },
     },
-    async execute(args) {
-      const arm = (args && args.arm) || 'A'
-      // 先感知物理末端: 经 SDK 读 sim_bridge 的 /joint_state 回传(含 tools: {A, B}).
-      // 装配末端是面板(人)的职责, 工具绝不改变装配, 只做"匹配 -> 执行".
-      const caps = await runCli('query_capabilities', [])
-      if (!caps.ok) return '感知失败: ' + caps.error
-      const tools = caps.parsed && caps.parsed.caps && caps.parsed.caps.tools
-      const cur = tools ? tools[arm] : undefined
-      if (cur !== 'grasp') {
-        return '臂 ' + arm + ' 当前末端是 "' + (cur || 'none') + '", 不是夹爪, 无法抓取(请先在面板给该臂挂夹爪)'
+    async execute() {
+      // 夹取策略第 1 步: 感知物理末端, 必须已是夹爪(装配是面板/人的职责, 实例不改变装配).
+      const seen = await perceive()
+      if (!seen.ok) return '臂 ' + arm + ' 夹取失败: 感知不到状态(' + seen.error + ')'
+      if (seen.tools[arm] !== 'grasp') {
+        return '臂 ' + arm + ' 当前末端是 "' + (seen.tools[arm] || 'none') + '", 不是夹爪, 无法夹取(请先在面板给该臂挂夹爪)'
       }
+      // 夹取策略第 2 步: 执行(接近 + 夹取, 由 sim_bridge 完成 IK 与触球).
       const touch = await runCli('touch', [arm])
-      if (!touch.ok) return 'grasp 失败: ' + touch.error
-      return '臂 ' + arm + ' 夹爪已去触碰小球 (touch ok)'
+      if (!touch.ok) return '臂 ' + arm + ' 夹取失败: ' + touch.error
+      // 夹取策略第 3 步: 状态校验(回传确认末端仍为夹爪).
+      const after = await perceive()
+      if (!after.ok) return '臂 ' + arm + ' 夹取完成, 但状态校验不可用(' + after.error + ')'
+      return '臂 ' + arm + ' 夹取完成: 末端 ' + after.tools[arm] + ', 小球位置 ' + JSON.stringify(after.ball) + ' (touch ok)'
     },
   })
 
-  console.log('[capability-grasp] grasp 工具已注册')
+  console.log('[capability-grasp] 臂 %s 挂载夹取策略实例(manipulate)', arm)
 
   return () => {
     unregister()
