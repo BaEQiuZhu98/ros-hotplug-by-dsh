@@ -82,7 +82,7 @@
 
 层 1  agent(任务 agent)      robo preset 挂载(每会话)
    ├─ persona                  「感知末端状态, 自适应决策, 不做低层控制, 不感知末端实现细节」
-   ├─ 臂管理器                  会话内创建/持有 armA、armB 作用域, 执行挂载/卸载
+   ├─ 臂管理器                  会话内预建 armA、armB 作用域并注册臂上下文, 提供 arm_status/take_object
    ├─ observer                  订阅 tools/change, 汇报能力集(观测能力)
    ├─ arm_status 工具           感知入口: 某臂是否具备可用末端
    └─ take_object 工具          执行入口: 让某臂去拿东西(策略由末端实例决定)
@@ -167,14 +167,14 @@
 | 2 | 面板 host | 参数校验 → 转发能力挂载服务 mount(cap, version, {arm}) |
 | 3 | 挂载服务 | **准入检查**: 读仓库目录 → sha256 与 manifest 比对(不通过 → 拒绝, 流程终止) |
 | 4 | 挂载服务 | **规则表检查**: 臂 A 已挂同 cap@version → 拒绝(同臂防重); 已挂别的 → 先卸载(替换); 未挂 → 放行 |
-| 5 | 挂载服务 | 动态 import host.js(带策略插件模块) → 转会话内臂管理器 |
-| 6 | 臂管理器 | 在 **armA 作用域** ctx.plugin(插件) → 插件 apply 注册 manipulate 实例(同名, armA 层); fiber.await 确认激活; 失败回收并拒绝 |
+| 5 | 挂载服务 | 动态 import host.js(带策略插件模块), 准备在臂上下文上挂载 |
+| 6 | 挂载服务 | 在已注册的 **armA 上下文(作用域)** 上 ctx.plugin(插件) → 插件 apply 注册 manipulate 实例(同名, armA 层); fiber.await 确认激活; 失败回收并拒绝 |
 | 7 | 挂载服务 | 记录 {armA: grasp@1.0.0, 句柄}; tools/change 广播(observer 收到, 更新能力集汇报) |
 | 8 | 面板 host | 挂载 ok → 物理装配 set_tool(A, grasp)(sim_bridge 臂 A 末端变红; 物理失败仅告警, 不回滚已成功的注册) |
 | 9 | 面板 client | 刷新状态: 臂 A 行 grasp@1.0.0 高亮 |
 | 10 | agent | 下次 arm_status(A) = {ready: true}; take_object(A) 自动走夹取策略 |
 
-卸载为对称流程: 面板点取消 → 挂载服务查臂句柄 → 臂管理器在 armA 层 dispose(实例注销,
+卸载为对称流程: 面板点取消 → 挂载服务查臂句柄 → 在 armA 上下文上 fiber.dispose(实例注销,
 不影响 armB) → 面板 set_tool(A, none)(末端复位) → 状态刷新.
 
 ### 7.9 拿小球指令的流程(以「用臂 A 去拿小球」为例)
@@ -214,7 +214,7 @@
 ### 7.11 写路径与读路径分离(唯一写者 = 人)
 
 ```
-写路径(唯一):  人 ──点击──► web 面板 ──RPC──► 能力挂载服务(准入) ──► 臂管理器(作用域挂/卸)
+写路径(唯一):  人 ──点击──► web 面板 ──RPC──► 能力挂载服务(准入 + 臂上下文挂/卸)
 读路径(agent): 任务 agent ──► arm_status(感知) + take_object(执行, 只读使用)
                观测 agent ──► tools/change 事件 + 状态回传(只读订阅, 汇报能力集)
 ```
@@ -341,7 +341,7 @@ ros-hotplug-by-dsh/
 - **npm 树外包 = 可选发布外壳**：`pack.sh` 把仓库目录打包成 tarball 分发到机器, 解包进仓库后走同一条挂载流程.
 - **能力挂载服务(mount_service)**：host 常驻插件(组合挂载, 非动态沙箱). 职责 = **准入检查**
   (mount_guard 哈希 + 规则表: 允许末端类型/同臂防重/替换) + **臂管理**(按臂记录 {arm, cap, version});
-  实际 `ctx.plugin`/`fiber.dispose` 由会话内的**臂管理器**在 armA/armB 作用域执行(§7.1).
+  `ctx.plugin`/`fiber.dispose` 由挂载服务在臂管理器注册的 armA/armB 上下文(作用域)上执行(§7.1).
   写入口 = web 面板 RPC; **不注册任何 agent 工具**.
 - **API 形式**：DSH 标准 Tool 契约; 热插拔 = DSH 的运行时挂载机制(ctx.plugin/dispose), 仓库目录是被热插拔的载体.
 

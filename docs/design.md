@@ -79,7 +79,7 @@ layer 0  global (machine)        host-composition mounts, inherited by every age
 
 layer 1  agent (task agent)      robo preset mount (per session)
    ├─ persona                  "perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"
-   ├─ arm manager               creates/holds armA, armB scopes in-session; performs mount/unmount
+   ├─ arm manager               pre-creates armA, armB scopes in-session, registers the arm contexts, provides arm_status/take_object
    ├─ observer                  subscribes to tools/change, reports the capability set
    ├─ arm_status tool           perception entry: is this arm ready (has a usable end-effector)
    └─ take_object tool          execution entry: have this arm take the object (strategy inside the instance)
@@ -153,14 +153,14 @@ The table only says allow/reject and never holds instances. Order: sha256 → ru
 | 2 | panel host | validates args → forwards mount(cap, version, {arm}) to the capability mount service |
 | 3 | mount service | **admission**: read repo dir → sha256 vs manifest (mismatch → reject, stop) |
 | 4 | mount service | **rule table**: arm A already has cap@version → reject (same-arm dedup); has another tool → unmount first (replace); empty → allow |
-| 5 | mount service | dynamic-import host.js (the strategy-bearing plugin module) → hand to the in-session arm manager |
-| 6 | arm manager | ctx.plugin(plugin) on the **armA scope** → apply registers the `manipulate` instance (same name, armA layer); fiber.await confirms activation; failure → dispose & reject |
+| 5 | mount service | dynamic-import host.js (the strategy-bearing plugin module), ready to mount on the arm contexts |
+| 6 | mount service | ctx.plugin(plugin) on the registered **armA context (scope)** → apply registers the `manipulate` instance (same name, armA layer); fiber.await confirms activation; failure → dispose & reject |
 | 7 | mount service | record {armA: grasp@1.0.0, handle}; tools/change broadcast (observer updates the capability report) |
 | 8 | panel host | mount ok → physical assembly set_tool(A, grasp) (sim_bridge turns arm A's tip red; physical failure only warns, never rolls back a successful registration) |
 | 9 | panel client | refresh: arm A row highlights grasp@1.0.0 |
 | 10 | agent | next arm_status(A) = {ready: true}; take_object(A) runs the grasp strategy |
 
-Unmount is symmetric: panel click → mount service looks up the arm handle → arm manager disposes on the armA layer (instance removed, armB unaffected) → panel set_tool(A, none) (tip resets) → refresh.
+Unmount is symmetric: panel click → mount service looks up the arm handle → fiber.dispose on the armA context (instance removed, armB unaffected) → panel set_tool(A, none) (tip resets) → refresh.
 
 ### 7.9 The grab-ball flow (example: "have arm A take the ball")
 
@@ -198,7 +198,7 @@ Precondition: arm A has grasp (grasp strategy), arm B has suction (suction strat
 ### 7.11 Write/read path separation (the human is the only writer)
 
 ```
-write path (only one):  human ──click──► web panel ──RPC──► capability mount service (admission) ──► arm manager (scope mount/unmount)
+write path (only one):  human ──click──► web panel ──RPC──► capability mount service (admission + mount/unmount on the arm contexts)
 read path (agents):     task agent ──► arm_status (perceive) + take_object (execute, read-only use)
                         observation agent ──► tools/change events + state feedback (read-only subscribe, report the capability set)
 ```
@@ -317,13 +317,13 @@ ros-hotplug-by-dsh/
 - **First-class deliverable = the capability repo directory**: `repo/<capability>/<version>/{host.js, manifest.json}`. host.js is a zero-dependency ESM `{apply, inject, name}` plugin; manifest.json records metadata + host.js sha256.
 - **Capability = a strategy-bearing end-effector instance**: each capability is the complete unit of "end-effector hardware + driving strategy" (grasp = grasp strategy, suction = suction strategy). Its apply registers the same-name `manipulate` tool **on an arm scope**; execute implements the strategy (perceive physical match → run strategy steps → state verification) and **never changes assembly**.
 - **npm out-of-tree = optional distribution shell**: `pack.sh` turns a repo directory into a tarball; installing unpacks it into the repo and follows the same mount flow (install ≠ mount).
-- **Capability mount service (mount_service)**: host-resident plugin (composition-mounted, not a dynamic sandbox). Duties = **admission checks** (mount_guard hash + rule table: allowed end-effector types / same-arm dedup / replace) + **arm bookkeeping** (per-arm {arm, cap, version}); the actual `ctx.plugin`/`fiber.dispose` runs in the in-session **arm manager** on the armA/armB scopes (§7.1). Write path = web panel RPC; **registers no agent tools**.
+- **Capability mount service (mount_service)**: host-resident plugin (composition-mounted, not a dynamic sandbox). Duties = **admission checks** (mount_guard hash + rule table: allowed end-effector types / same-arm dedup / replace) + **arm bookkeeping** (per-arm {arm, cap, version}); the actual `ctx.plugin`/`fiber.dispose` runs on the armA/armB contexts (scopes) registered by the in-session arm manager (§7.1). Write path = web panel RPC; **registers no agent tools**.
 - **API form**: DSH's standard Tool contract; hot-plugging is DSH's runtime mount mechanism (ctx.plugin/dispose), and the repo directory is the carrier being hot-plugged.
 
 ### 10.4 L2 runtime carrier (agent preset)
 
 - **Form**: a **directory** (`~/.dsh/.agent-presets/robo/`), not an npm package.
-- **Contents**: `agent.cordis.yml` (composition: persona row + observer row + **arm-manager row** (pre-creates armA/armB scopes in-session and performs mount/unmount) + arm_status/take_object tool rows + skills mounting; **no capability rows** — assembly belongs to the mount system, the preset only perceives and executes), persona ("perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"), skills.
+- **Contents**: `agent.cordis.yml` (composition: persona row + observer row + **arm-manager row** (pre-creates armA/armB scopes in-session and registers the arm contexts) + arm_status/take_object tool rows + skills mounting; **no capability rows** — assembly belongs to the mount system, the preset only perceives and executes), persona ("perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"), skills.
 - **Function**: after install, choose "robo" when creating a session → an out-of-the-box robot task agent; the observer subscribes to `tools/change` and reports the capability set.
 - **API form**: cordis.yml composition declarations (plugin rows/scopes) + persona/skill text.
 

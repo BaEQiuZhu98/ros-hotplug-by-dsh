@@ -36,9 +36,9 @@
 |---|---|---|
 | capability / capability instance | the complete unit of end-effector hardware + driving strategy (grasp = grasp strategy, suction = suction strategy) | strategy-bearing instances on arm scopes |
 | arm scope | one sub-scope per arm (createScope(agentCtx, 'armA'/'armB')): end-effector instances mount here, same-name instances never cross-talk | the hot-plug space anchor |
-| arm manager | in-session plugin: pre-creates the two arm scopes and performs ctx.plugin / fiber.dispose | `src/presets/robo` |
+| arm manager | in-session plugin: pre-creates the two arm scopes, registers the arm contexts; provides arm_status/take_object | `src/presets/robo` |
 | arm_status / take_object | the agent's two tools: perceive whether an arm is ready / have the arm take the object (strategy inside the instance) | hardware-difference shielding |
-| mount / unmount | the arm manager registers/deregisters a capability instance on an arm scope at runtime (`ctx.plugin` / `fiber.dispose`) | mount service + arm manager |
+| mount / unmount | the mount service registers/deregisters a capability instance on an arm context (scope) at runtime (`ctx.plugin` / `fiber.dispose`) | mount service + arm manager |
 | manifest | capability metadata + code hash | used by the pre-mount check |
 | mount guard | the gate that verifies the hash before mounting (zero-trust) | `src/capabilities/mount_guard.py` |
 | zero-trust / hash check | treat every mount as untrusted; verify before mounting | tampered manifest → rejected |

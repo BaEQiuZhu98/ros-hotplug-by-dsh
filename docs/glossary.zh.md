@@ -23,9 +23,9 @@
 | plugin / package / run | 版本时序：插件实例 / 不可变代码版本 / 一次激活尝试 | 多版本共存、回滚 |
 | 树外包（out-of-tree） | 持久、可发布的 npm 插件包（`dsh plugin add` 安装）；本项目里只作能力目录的**发布外壳** | 公开分发用，解包进能力仓库后走挂载服务 |
 | 能力仓库目录 | 能力的一等交付件：`repo/<能力>/<版本>/{host.js, manifest.json}`，零依赖 | `src/capabilities/repo/` |
-| 能力挂载服务 | host 常驻插件：准入检查（sha256 + 规则表）+ 臂管理；实例落位由会话内臂管理器执行；唯一写入口 = web 面板 RPC，**不注册 agent 工具** | `src/capabilities/mount_service/` |
+| 能力挂载服务 | host 常驻插件：准入检查（sha256 + 规则表）+ 按臂记录 + 在臂上下文上 ctx.plugin/dispose；唯一写入口 = web 面板 RPC，**不注册 agent 工具** | `src/capabilities/mount_service/` |
 | 臂作用域 | 每条机械臂一个子作用域（createScope(agentCtx, 'armA'/'armB')）：末端实例挂在这里，同名实例互不串台 | 热插拔的「空间锚点」 |
-| 臂管理器 | 会话内插件：预建两条臂作用域，执行实例的 ctx.plugin / fiber.dispose | `src/presets/robo` |
+| 臂管理器 | 会话内插件：预建两条臂作用域并注册臂上下文；提供 arm_status/take_object | `src/presets/robo` |
 | arm_status / take_object | agent 的两个工具：感知该臂是否可用（ready）/ 让该臂去拿东西（策略在实例内部） | 硬件差异屏蔽层 |
 | profile / preset | profile=应用层启动配置；preset=agent 层组成配置（目录） | `robo` preset 是「开箱即用的机器人 agent」 |
 | 工具（tool） | agent 可调用的能力，契约 = name/description/parameters/output/execute | agent 工具 arm_status/take_object；末端实例同名注册 manipulate |
@@ -40,7 +40,7 @@
 | 名词 | 一句话含义 | 对应项目实现点 |
 |---|---|---|
 | 能力（capability）/ 能力实例 | 末端硬件 + 驱动策略的完整单元（grasp = 夹取策略, suction = 吸附策略） | 带策略实例, 挂臂作用域 |
-| 挂载 / 卸载 | 臂管理器在臂作用域运行时注册/撤销能力实例（`ctx.plugin` / `fiber.dispose`，不重启） | `mount_service` + 臂管理器 |
+| 挂载 / 卸载 | 挂载服务在臂上下文(作用域)上运行时注册/撤销能力实例（`ctx.plugin` / `fiber.dispose`，不重启） | `mount_service` + 臂管理器 |
 | manifest | 能力元数据 + 代码哈希 | 挂载前校验用 |
 | 挂载守卫（mount_guard） | 挂载前验哈希的闸（零信任） | `src/capabilities/mount_guard.py` |
 | 零信任 / 哈希校验 | 每次挂载都假设不可信，先验身再上机 | 篡改 manifest → 拒绝挂载 |

@@ -11,7 +11,7 @@
 - **一等交付件 = 能力仓库目录**: `repo/<capability>/<version>/{host.js, manifest.json}`, host.js 零依赖.
   npm 树外包是可选**发布外壳**(pack.sh 打包 tarball 分发, 解包进仓库后走同一挂载流程).
 - **唯一写者 = 人**: 挂载/卸载只经 web 面板 RPC → 能力挂载服务; agent 的工具表里没有挂/卸工具.
-- **热插拔 = DSH 的运行时挂载机制**: 臂管理器在**臂作用域**执行 `ctx.plugin(...)` / `fiber.dispose()`,
+- **热插拔 = DSH 的运行时挂载机制**: 挂载服务在臂管理器注册的**臂上下文(作用域)**上执行 `ctx.plugin(...)` / `fiber.dispose()`,
   插入即见、拔出即回收, 全程不重启.
 - **准入检查(配置表, 不是作用域)**: 每次挂载前 mount_guard 对 host.js 重算 SHA256 与 manifest 比对,
   再经挂载服务的规则表(该臂允许的末端类型 / 同臂防重 / 替换规则).
@@ -74,14 +74,14 @@ export function apply(ctx, config = {}) {
 - **能力挂载服务(mount_service)**: host 常驻插件(组合挂载, 非动态沙箱——动态沙箱 ctx 隐藏
   `ctx.plugin`/`fiber` 等框架内部). 职责:
   - 准入检查: sha256 + 规则表(该臂允许的末端类型 / 同臂防重 / 替换);
-  - 臂管理: 按臂记录 {arm, cap, version}; 动态 import 能力插件后转会话内臂管理器落位;
+  - 臂管理: 按臂记录 {arm, cap, version}; 动态 import 能力插件后在臂上下文上落位;
   - 不注册任何 agent 工具.
 - **臂管理器(robo preset 内, 会话级)**: 会话创建时在 agent 上下文下预建 armA/armB 两个空作用域
-  (`createScope(agentCtx, 'armA'/'armB')`); 挂载 = 在目标臂作用域 `ctx.plugin`(注册 manipulate 实例),
-  卸载 = 该臂作用域 `fiber.dispose()`(只回收本臂实例).
+  (`createScope(agentCtx, 'armA'/'armB')`)并 registerArms 注册到挂载服务; 挂载 = 挂载服务在目标
+  臂上下文上 `ctx.plugin`(注册 manipulate 实例), 卸载 = 该臂上下文 `fiber.dispose()`(只回收本臂实例).
 
 ```text
-mount(cap, version, {arm})  准入检查 -> 动态 import -> 臂管理器在 armX 作用域 ctx.plugin
+mount(cap, version, {arm})  准入检查 -> 动态 import -> 挂载服务在 armX 上下文 ctx.plugin
                             -> 同臂防重: 臂 X 已挂同 cap@version 拒绝; 已挂别的先卸载(替换)
 unmount(arm)                臂作用域 dispose(该能力实例注销; 不影响另一臂)
 list()                      {repo, mounted: [{arm, cap, version}]}
