@@ -50,10 +50,7 @@
 
 - id: robo-arm-manager
   name: '__ARM_MANAGER__/src/index.js'
-  config:
-    # 仓库根(找 bridge_client.py)与 venv python(有 roslibpy).
-    workdir: /root/my-project/ros-hotplug-by-dsh
-    python: /root/venvs/robo/bin/python3
+  # 无 config: 工作路径与 venv python 由挂载服务的 env() 统一提供(路径唯一来源).
 
 # ── 观测插件(设计 §7.6): 订阅 tools/change 汇报能力集 ───────────────────────
 

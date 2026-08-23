@@ -15,6 +15,20 @@
 | `bridge/` | 消息契约 v1.1(`contract.md`) + 薄 SDK(`bridge_client.py`) + 验证脚本(`example_drive.py`) |
 | `sim/models/` `sim/scenes/` | MJCF 模型与预置场景(唯一模型来源) |
 
+## 快速安装(setup.sh)
+
+git clone 后一条命令接入 DSH(路径全部自动取本机实际值, 无需手改):
+
+```bash
+bash src/setup.sh [DSH_HOME] [profile] [venv-python]
+# 默认: ~/.dsh / web / /root/venvs/robo/bin/python3
+```
+
+脚本做三件事: ① 把挂载服务行写入 profile 的 patch 层(repo/workdir/python 自动填,
+**这是全项目唯一的路径来源**, 面板与臂管理器都从挂载服务的 env() 读取);
+② 装 robo preset 与臂管理器包; ③ 打印后续步骤(重启 web / 建「机器人任务」会话 /
+激活面板 / 起 rosbridge 与 sim_bridge).
+
 ## 依赖与运行前提
 
 - ROS2 Humble + rosbridge_server(系统).

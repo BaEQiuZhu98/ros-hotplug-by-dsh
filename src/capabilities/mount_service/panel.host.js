@@ -12,8 +12,10 @@ return {
   inject: ['capabilityMount', 'shell'],
   apply(ctx) {
     const svc = ctx.capabilityMount
-    const WORKDIR = '/root/my-project/ros-hotplug-by-dsh'
-    const PYTHON = '/root/venvs/robo/bin/python3'
+    // 工作路径与 venv python 统一从挂载服务取(唯一路径来源, setup.sh 写入组合 config).
+    const env = svc.env()
+    const WORKDIR = env.workdir
+    const PYTHON = env.python
 
     function runCli(method, argv) {
       const cmd = [PYTHON, WORKDIR + '/src/bridge/bridge_client.py', method, ...argv].join(' ')

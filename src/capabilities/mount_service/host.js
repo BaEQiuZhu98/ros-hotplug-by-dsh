@@ -176,7 +176,7 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  ctx.provide('capabilityMount', { registerArms, mount, unmount, list })
+  ctx.provide('capabilityMount', { registerArms, mount, unmount, list, env: () => ({ workdir, python }) })
   console.log('[cap-mount-service] 已就绪, repo=%s', repo)
 
   // 插件 dispose: 回收全部挂载.

@@ -16,8 +16,10 @@ export const name = 'robo-arm-manager'
 export const inject = ['capabilityMount', 'tools', 'shell']
 
 export function apply(ctx, config = {}) {
-  const workdir = config.workdir ?? '.'
-  const python = config.python ?? 'python3'
+  // 工作路径与 venv python 统一从挂载服务取(唯一路径来源, setup.sh 写入组合 config).
+  const env = ctx.capabilityMount.env ? ctx.capabilityMount.env() : {}
+  const workdir = config.workdir ?? env.workdir ?? '.'
+  const python = config.python ?? env.python ?? 'python3'
 
   // 两条臂作用域: 键对象即 scope 身份; parent 绑到本作用域(事件沿链上抛).
   const armKeys = { A: {}, B: {} }
