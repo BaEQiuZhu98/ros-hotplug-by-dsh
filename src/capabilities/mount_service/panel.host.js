@@ -7,21 +7,13 @@
 //   - 点工具按钮 = 该臂挂载能力 + set_tool 物理生效; 再点 = 卸载 + 末端复位.
 //   - 臂间独立: A/B 可挂同名能力(挂载服务按臂管理); 同臂重复挂同版本被挂载服务拒绝.
 //   - 「去拿小球」= 把消息发给 agent(client 用 inputActions), 不在 host 执行.
+//   - 物理装配与挂载同走挂载服务常驻 bridge(P2-10): 不再 spawn python CLI,
+//     rosbridge 连接全程常驻, 与能力实例/臂管理器同通道.
 return {
   name: 'cap-mount-panel',
-  inject: ['capabilityMount', 'shell'],
+  inject: ['capabilityMount'],
   apply(ctx) {
     const svc = ctx.capabilityMount
-    // 工作路径与 venv python 统一从挂载服务取(唯一路径来源, setup.sh 写入组合 config).
-    const env = svc.env()
-    const WORKDIR = env.workdir
-    const PYTHON = env.python
-
-    function runCli(method, argv) {
-      const cmd = [PYTHON, WORKDIR + '/src/bridge/bridge_client.py', method, ...argv].join(' ')
-      const spec = ctx.shell.resolve({ command: cmd, workdir: WORKDIR, timeoutMs: 15000 })
-      return ctx.shell.run(spec).then((res) => ((res.stdout && res.stdout.text) || '').trim())
-    }
 
     harness.handle('cap_list', async () => svc.list())
 
@@ -32,25 +24,26 @@ return {
       if (arm !== 'A' && arm !== 'B') return { ok: false, error: '非法机械臂: ' + arm }
       const r = await svc.mount(cap, version, { arm })
       if (!r.ok) return r
-      const st = await runCli('set_tool', [arm, cap])
-      return { ok: true, arm: arm, cap: r.cap, version: r.version, output: st }
+      // 挂载结果与物理装配结果分离: 挂载成功即 ok, 装配失败单独在 physical 字段标明.
+      const ph = await svc.bridge('set_tool', [arm, cap])
+      return { ok: true, arm: arm, cap: r.cap, version: r.version, physical: { ok: ph.ok === true, output: JSON.stringify(ph) } }
     })
 
     harness.handle('arm_unmount', async (args) => {
       const arm = String(args && args.arm)
       const r = await svc.unmount(arm)
       if (!r.ok) return r
-      await runCli('set_tool', [arm, 'none'])
-      return { ok: true, arm: arm, output: '已卸载 ' + r.cap + '@' + r.version + ', 末端复位' }
+      const ph = await svc.bridge('set_tool', [arm, 'none'])
+      return { ok: true, arm: arm, output: '已卸载 ' + r.cap + '@' + r.version + ', 末端复位', physical: { ok: ph.ok === true, output: JSON.stringify(ph) } }
     })
 
     harness.handle('reset_all', async () => {
       for (const arm of ['A', 'B']) {
         const r = await svc.unmount(arm)
-        if (r.ok) await runCli('set_tool', [arm, 'none'])
+        if (r.ok) await svc.bridge('set_tool', [arm, 'none'])
       }
-      const st = await runCli('reset', [])
-      return { ok: true, output: st || '已全部复位' }
+      const ph = await svc.bridge('reset', [])
+      return { ok: true, output: '已全部复位', physical: { ok: ph.ok === true, output: JSON.stringify(ph) } }
     })
   },
 }

@@ -4,6 +4,6 @@
     "version": "1.0.0",
     "description": "夹爪能力: 把指定臂末端切到夹爪并触碰小球",
     "tool": "host.js",
-    "sha256": "1d6f98dc52a00ae7bfb3bd640334ddde7a2107e106565d8bb38f6d63145555a1"
+    "sha256": "b5eeab1d8a981627bea1964456193c382cd5eb4e119ac4f7dd03c23bb7b85e73"
   }
 }

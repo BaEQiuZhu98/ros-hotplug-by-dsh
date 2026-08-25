@@ -5,31 +5,16 @@
 // (装配末端是面板/人的职责).
 // 零依赖: 不 import 任何包, 只用注入的服务与手写 Tool 契约.
 export const name = 'capability-suction'
-export const inject = ['tools', 'shell']
+export const inject = ['tools', 'capabilityMount']
 
 export function apply(ctx, config = {}) {
-  // config 由挂载体系注入: arm = 本实例所属机械臂, workdir/python = 环境.
+  // config 由挂载体系注入: arm = 本实例所属机械臂(workdir/python 由挂载服务 daemon 持有, 本实例不直接使用).
   const arm = config.arm ?? 'A'
-  const workdir = config.workdir ?? '.'
-  const python = config.python ?? 'python3'
-  const BRIDGE = 'src/bridge/bridge_client.py'
 
-  // 跑一条 SDK CLI 命令, 解析 JSON 输出. 返回 {ok, error, parsed}.
+  // 经挂载服务常驻 bridge(P2-10)调用 SDK: 复用一条 rosbridge 连接, 不再 spawn python 子进程.
   async function runCli(method, args) {
-    const cmd = [python, BRIDGE, method, ...args].join(' ')
-    const spec = ctx.shell.resolve({ command: cmd, workdir, timeoutMs: 15000 })
-    try {
-      const res = await ctx.shell.run(spec)
-      const text = ((res.stdout && res.stdout.text) || '').trim()
-      try {
-        const parsed = JSON.parse(text)
-        return { ok: parsed.ok === true, error: parsed.error || '', parsed }
-      } catch (e) {
-        return { ok: false, error: 'SDK 输出不是 JSON: ' + text }
-      }
-    } catch (e) {
-      return { ok: false, error: 'shell 调用失败: ' + e }
-    }
+    const parsed = await ctx.capabilityMount.bridge(method, args)
+    return { ok: parsed.ok === true, error: parsed.error || '', parsed }
   }
 
   // 读 sim_bridge 状态回传, 返回 {ok, tools, ball} 或错误.

@@ -13,38 +13,23 @@
 import { createScope, scopeOf } from '@deepseek-ai/dsh-scope'
 
 export const name = 'robo-arm-manager'
-export const inject = ['capabilityMount', 'tools', 'shell']
+export const inject = ['capabilityMount', 'tools']
 
-export function apply(ctx, config = {}) {
-  // 工作路径与 venv python 统一从挂载服务取(唯一路径来源, setup.sh 写入组合 config).
-  const env = ctx.capabilityMount.env ? ctx.capabilityMount.env() : {}
-  const workdir = config.workdir ?? env.workdir ?? '.'
-  const python = config.python ?? env.python ?? 'python3'
+export function apply(ctx) {
 
   // 两条臂作用域: 键对象即 scope 身份; parent 绑到本作用域(事件沿链上抛).
   const armKeys = { A: {}, B: {} }
   const armA = createScope(ctx, armKeys.A, { parent: scopeOf(ctx) })
   const armB = createScope(ctx, armKeys.B, { parent: scopeOf(ctx) })
   // 向挂载服务注册臂上下文: 实例的挂/卸由挂载服务在对应上下文上执行.
-  ctx.capabilityMount.registerArms({ A: armA.ctx, B: armB.ctx })
+  // 保存注销句柄: 会话关闭时对称注销, 避免挂载服务持有已销毁的上下文.
+  const unregisterArms = ctx.capabilityMount.registerArms({ A: armA.ctx, B: armB.ctx })
   console.log('[robo-arm-manager] armA/armB 作用域已就绪')
 
-  // 读 sim_bridge 状态回传.
+  // 经挂载服务常驻 bridge 调用 SDK(与能力实例同通道, 不再 spawn python; 审查 v1 N3).
   async function runCli(method, args) {
-    const cmd = [python, 'src/bridge/bridge_client.py', method, ...args].join(' ')
-    const spec = ctx.shell.resolve({ command: cmd, workdir, timeoutMs: 15000 })
-    try {
-      const res = await ctx.shell.run(spec)
-      const text = ((res.stdout && res.stdout.text) || '').trim()
-      try {
-        const parsed = JSON.parse(text)
-        return { ok: parsed.ok === true, error: parsed.error || '', parsed }
-      } catch (e) {
-        return { ok: false, error: 'SDK 输出不是 JSON: ' + text }
-      }
-    } catch (e) {
-      return { ok: false, error: 'shell 调用失败: ' + e }
-    }
+    const parsed = await ctx.capabilityMount.bridge(method, args)
+    return { ok: parsed.ok === true, error: parsed.error || '', parsed }
   }
 
   // 感知入口: 只回答该臂是否可用(ready), 不泄露末端型号.
@@ -103,6 +88,7 @@ export function apply(ctx, config = {}) {
   return () => {
     unregisterStatus()
     unregisterTake()
+    if (typeof unregisterArms === 'function') unregisterArms()
     armA.dispose()
     armB.dispose()
   }

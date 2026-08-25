@@ -13,6 +13,7 @@
 //
 // 臂间独立: 不同臂可挂同名能力(实例同名 manipulate, 靠臂作用域隔离, 互不串台).
 import { createHash } from 'node:crypto'
+import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -24,6 +25,138 @@ export function apply(ctx, config = {}) {
   const repo = resolve(config.repo ?? 'src/capabilities/repo')
   const workdir = config.workdir ?? '.'
   const python = config.python ?? 'python3'
+
+  // --- SDK 常驻 daemon(P2-10 / 审查 v1 N1+N2 加固) ---
+  // 常驻 bridge_client daemon: 一条 rosbridge 连接复用, 能力执行不再 spawn python 子进程.
+  // 状态机带 generation 号: 旧代输出丢弃(防响应串台); 僵死进程 kill 后重建; 响应等待 5s 超时兜底.
+  let daemonProc = null
+  let daemonChain = Promise.resolve()
+  let daemonGeneration = 0
+  let readyWaiters = []
+  let respWaiters = []
+  let lineBuffer = ''
+  let daemonStatus = 'down'
+
+  function failDaemon(reason) {
+    daemonStatus = 'down'
+    const err = reason instanceof Error ? reason : new Error(String(reason))
+    for (const w of readyWaiters.splice(0)) w.reject(err)
+    for (const w of respWaiters.splice(0)) w.reject(err)
+  }
+
+  function killDaemon(reason) {
+    if (daemonProc === null) return
+    const proc = daemonProc
+    daemonProc = null
+    daemonGeneration += 1
+    // 解绑旧代流与事件监听(N2-c): 'exit' 早于流 'close', 旧缓冲行不得再进状态机.
+    try { proc.stdout.removeAllListeners('data') } catch (e) {}
+    try { proc.stderr.removeAllListeners('data') } catch (e) {}
+    try { proc.removeAllListeners('exit') } catch (e) {}
+    try { proc.removeAllListeners('error') } catch (e) {}
+    daemonStatus = 'down'
+    if (reason !== undefined && reason !== null) {
+      const text = reason instanceof Error ? reason.message : String(reason)
+      console.warn('[cap-mount-service] daemon 已重置: %s', text)
+    }
+    try { proc.kill() } catch (e) {}
+  }
+
+  function handleDaemonLine(generation, line) {
+    if (generation !== daemonGeneration) return  // 旧代输出丢弃.
+    if (daemonStatus === 'starting') {
+      try {
+        const parsed = JSON.parse(line)
+        if (parsed.ok === true) {
+          daemonStatus = 'ready'
+          for (const w of readyWaiters.splice(0)) w.resolve()
+        } else {
+          const err = new Error(parsed.error || 'daemon 启动失败')
+          killDaemon(err)
+          failDaemon(err)
+        }
+      } catch (e) {
+        // 非 JSON 首行(N2-b): 视为不可用进程, 杀掉并失败; 下次调用重新 spawn, 不挂起.
+        const err = new Error('daemon 输出不是 JSON: ' + line.slice(0, 80))
+        killDaemon(err)
+        failDaemon(err)
+      }
+      return
+    }
+    if (respWaiters.length > 0) respWaiters.shift().resolve(line)
+    else console.warn('[cap-mount-service] daemon 非预期输出: %s', line)
+  }
+
+  function ensureDaemon() {
+    if (daemonProc !== null && daemonStatus === 'ready') return Promise.resolve()
+    if (daemonProc !== null) return new Promise((resolve, reject) => readyWaiters.push({ resolve, reject }))
+    daemonStatus = 'starting'
+    const generation = daemonGeneration
+    const proc = spawn(python, [join(workdir, 'src/bridge/bridge_client.py'), 'daemon'], { cwd: workdir })
+    daemonProc = proc
+    proc.stdout.setEncoding('utf8')
+    proc.stdout.on('data', (chunk) => {
+      if (generation !== daemonGeneration) return
+      lineBuffer += chunk
+      let index
+      while ((index = lineBuffer.indexOf('\n')) !== -1) {
+        const line = lineBuffer.slice(0, index).trim()
+        lineBuffer = lineBuffer.slice(index + 1)
+        if (line) handleDaemonLine(generation, line)
+      }
+    })
+    // N1-b: stderr 不再静默, 保留错误信息供排障.
+    proc.stderr.setEncoding('utf8')
+    proc.stderr.on('data', (chunk) => {
+      if (generation !== daemonGeneration) return
+      const tail = String(chunk).trim()
+      if (tail) console.warn('[cap-mount-service] daemon stderr: %s', tail)
+    })
+    // N2-a: spawn 错误(如 python 路径 ENOENT)必须监听, 否则 Node 抛未捕获异常.
+    proc.on('error', (err) => {
+      if (generation !== daemonGeneration) return
+      killDaemon()
+      failDaemon(err)
+    })
+    proc.on('exit', () => {
+      if (generation !== daemonGeneration) return
+      killDaemon(new Error('daemon 已退出'))
+      failDaemon(new Error('daemon 已退出'))
+    })
+    return new Promise((resolve, reject) => readyWaiters.push({ resolve, reject }))
+  }
+
+  // 串行转发(行协议 FIFO): 每次调用等待 daemon 一行响应; 5s 超时兜底并重置 daemon(N2-d).
+  function bridge(method, args) {
+    const run = async () => {
+      await ensureDaemon()
+      const request = JSON.stringify({ method: method, args: args || [] }) + '\n'
+      const response = await new Promise((resolve, reject) => {
+        let timer = null
+        const waiter = {
+          resolve: (line) => { if (timer) clearTimeout(timer); resolve(line) },
+          reject: (err) => { if (timer) clearTimeout(timer); reject(err) },
+        }
+        timer = setTimeout(() => {
+          const index = respWaiters.indexOf(waiter)
+          if (index !== -1) respWaiters.splice(index, 1)
+          killDaemon(new Error('daemon 响应超时(5s)'))
+          reject(new Error('daemon 响应超时(5s)'))
+        }, 5000)
+        respWaiters.push(waiter)
+        daemonProc.stdin.write(request)
+      })
+      try {
+        return JSON.parse(response)
+      } catch (e) {
+        return { ok: false, error: 'daemon 响应不是 JSON: ' + response }
+      }
+    }
+    const next = daemonChain.then(run, run)
+    daemonChain = next.catch(() => {})
+    return next
+  }
+
 
   // arm -> [{ctx, ...}]  臂管理器注册的臂上下文(每会话一套, 追加).
   const armContexts = { A: [], B: [] }
@@ -102,13 +235,25 @@ export function apply(ctx, config = {}) {
   }
 
   function registerArms(arms) {
+    const registered = []
     for (const arm of ['A', 'B']) {
-      if (arms[arm] !== undefined && arms[arm] !== null) armContexts[arm].push(arms[arm])
+      if (arms[arm] !== undefined && arms[arm] !== null) {
+        armContexts[arm].push(arms[arm])
+        registered.push({ arm, ctx: arms[arm] })
+      }
     }
     console.log('[cap-mount-service] 臂上下文注册: A=%d 套, B=%d 套', armContexts.A.length, armContexts.B.length)
+    // 返回对称注销函数(按对象引用删除): 会话关闭时臂管理器调用, 防悬垂上下文与数组膨胀.
+    return function unregisterArms() {
+      for (const { arm, ctx: target } of registered) {
+        const index = armContexts[arm].indexOf(target)
+        if (index !== -1) armContexts[arm].splice(index, 1)
+      }
+      console.log('[cap-mount-service] 臂上下文注销: A=%d 套, B=%d 套', armContexts.A.length, armContexts.B.length)
+    }
   }
 
-  async function unmount(arm) {
+  async function doUnmount(arm) {
     const cur = armsByArm.get(arm)
     if (!cur) return { ok: false, error: '臂 ' + arm + ' 没有挂载末端' }
     for (const f of cur.fibers) {
@@ -122,7 +267,27 @@ export function apply(ctx, config = {}) {
     return { ok: true, arm, cap: cur.cap, version: cur.version }
   }
 
+  // per-arm 串行队列(P1-6): 同一臂的挂/卸串行化, 防并发交错导致终态不符.
+  const armQueues = { A: Promise.resolve(), B: Promise.resolve() }
+  function enqueueArm(arm, work) {
+    const next = armQueues[arm].then(work, work)
+    armQueues[arm] = next.catch(() => {})
+    return next
+  }
+
+  // 导出面: 校验后入队.
   async function mount(cap, version, options = {}) {
+    const arm = options.arm
+    if (arm !== 'A' && arm !== 'B') return { ok: false, error: '非法机械臂: ' + (arm || '(未指定)') }
+    return enqueueArm(arm, () => doMount(cap, version, options))
+  }
+
+  async function unmount(arm) {
+    if (arm !== 'A' && arm !== 'B') return { ok: false, error: '非法机械臂: ' + (arm || '(未指定)') }
+    return enqueueArm(arm, () => doUnmount(arm))
+  }
+
+  async function doMount(cap, version, options = {}) {
     const arm = options.arm
     if (arm !== 'A' && arm !== 'B') return { ok: false, error: '非法机械臂: ' + (arm || '(未指定)') }
     const cur = armsByArm.get(arm)
@@ -137,7 +302,7 @@ export function apply(ctx, config = {}) {
       return { ok: false, error: '臂 ' + arm + ' 没有臂上下文(请先创建「机器人任务」会话)' }
     }
     // 同臂换挂: 先卸载旧实例, 新实例挂载失败则尽力恢复旧实例(旧末端仍在).
-    if (cur !== undefined) await unmount(arm)
+    if (cur !== undefined) await doUnmount(arm)
     // 在全部臂上下文(各会话的该臂作用域)上挂载同名实例; 不同臂上下文同名实例互不冲突.
     const fibers = []
     for (const targetCtx of contexts) {
@@ -150,7 +315,8 @@ export function apply(ctx, config = {}) {
             // 尽力回收.
           }
         }
-        // 恢复旧实例(尽力而为), 保证失败回滚: 旧末端不受新挂载失败影响.
+        // 恢复旧实例(尽力而为): 换挂存在短暂窗口期(先摘旧再挂新), 失败后自动恢复旧末端;
+        // 恢复成功/失败都显式告警并在返回值中标明(与文档「失败回滚」语义一致).
         if (cur !== undefined) {
           const restored = []
           for (const targetCtx of contexts) {
@@ -159,9 +325,13 @@ export function apply(ctx, config = {}) {
           }
           if (restored.length > 0) {
             armsByArm.set(arm, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
+            console.warn('[cap-mount-service] 臂 %s 换挂 %s@%s 失败, 已自动恢复旧末端 %s@%s', arm, cap, version, cur.cap, cur.version)
+            return { ok: false, error: r.error, restored: true }
           }
+          console.error('[cap-mount-service] 臂 %s 换挂失败且旧末端 %s@%s 恢复失败, 旧末端已丢失', arm, cur.cap, cur.version)
+          return { ok: false, error: r.error + '(且旧末端恢复失败)', restored: false }
         }
-        return { ok: false, error: r.error, restored: cur !== undefined }
+        return { ok: false, error: r.error, restored: false }
       }
       fibers.push({ dispose: r.dispose })
     }
@@ -176,7 +346,7 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  ctx.provide('capabilityMount', { registerArms, mount, unmount, list, env: () => ({ workdir, python }) })
+  ctx.provide('capabilityMount', { registerArms, mount, unmount, list, env: () => ({ workdir, python }), bridge })
   console.log('[cap-mount-service] 已就绪, repo=%s', repo)
 
   // 插件 dispose: 回收全部挂载.
@@ -193,5 +363,13 @@ export function apply(ctx, config = {}) {
     armsByArm.clear()
     armContexts.A.length = 0
     armContexts.B.length = 0
+    if (daemonProc !== null) {
+      try {
+        daemonProc.kill()
+      } catch (e) {
+        // 尽力回收.
+      }
+      daemonProc = null
+    }
   }
 }

@@ -26,12 +26,12 @@ repo/grasp/1.0.0/
 
 ## 3. host.js 契约
 
-- **零依赖**: 不 import 任何包, 只用注入的服务与手写 Tool 契约.
+- **零依赖**: 不 import 任何包, 只用注入的服务与手写 Tool 契约; 同构能力之间允许模板化重复(零依赖约束下每个能力目录自包含, 这是有意取舍).
 - ESM 命名导出 `{ apply, inject, name }`(Cordis Plugin):
 
 ```js
 export const name = 'capability-grasp'
-export const inject = ['tools', 'shell']
+export const inject = ['tools', 'capabilityMount']
 export function apply(ctx, config = {}) {
   // config 由臂管理器注入(workdir/python 等)
   const unregister = ctx.tools.register({
@@ -49,7 +49,9 @@ export function apply(ctx, config = {}) {
 ```
 
 - Tool 契约 = DSH 标准(`{name, description, parameters(JSON Schema), output{schema,render}, execute}`), 不造新协议.
-- 执行链: execute → `ctx.shell` 调 `bridge_client.py` CLI → rosbridge → sim_bridge.
+- 执行链: execute → `ctx.capabilityMount.bridge(method, args)`(挂载服务常驻的 SDK daemon 通道)
+  → rosbridge → sim_bridge. 能力依赖挂载服务的 bridge 通道(分发给无挂载服务的主机不可独立运行,
+  这是挂载体系的约定依赖).
 - 副作用全部随插件 dispose 回收(apply 返回 disposer).
 
 ## 4. manifest.json 字段与准入校验
@@ -88,14 +90,14 @@ list()                      {repo, mounted: [{arm, cap, version}]}
 ```
 
 - **臂间独立**: 不同臂可挂同名能力(A/B 各挂 grasp), 同名 manipulate 实例按作用域隔离, 互不串台.
-- **失败回滚**: 新实例激活失败则旧句柄保留, 旧末端照常可用.
+- **失败回滚**: 换挂先摘旧再挂新(存在短暂窗口), 新实例激活失败自动恢复旧实例(尽力, 恢复失败显式告警).
 - **事件**: 挂/卸触发 `tools/change` 广播, observer 订阅感知.
 
 ## 6. 版本策略: 换版与回滚
 
 - 版本 = 能力目录名(语义化版本目录 `1.0.0`/`1.1.0`).
 - 换版: 面板选新版本 → 该臂卸载旧实例 + 挂载新实例, agent 的 arm_status/take_object 语义不变.
-- 回滚: 新实例激活失败(挂载返回 error)→ 旧实例保留, 旧末端照常可用; 也可显式换回旧版本.
+- 回滚: 换挂失败(挂载返回 error, restored 字段标明恢复结果)→ 自动恢复旧实例(尽力); 也可显式换回旧版本.
 - 灰度切流不演示; 秒级回滚是句柄模型的原生能力.
 
 ## 7. 分发流程(npm 发布外壳, 可选)

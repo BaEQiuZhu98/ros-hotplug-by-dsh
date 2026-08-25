@@ -29,8 +29,13 @@ return {
 
         function call(method, args) {
           host.call(method, args).then((res) => {
-            if (res && res.ok) setNote((res.output || 'ok').slice(0, 80))
-            else setNote((res && res.error) || '失败')
+            if (res && res.ok) {
+              if (res.physical && res.physical.ok === false) {
+                setNote('挂载成功, 但物理装配失败: ' + String(res.physical.output || '').slice(0, 60))
+              } else {
+                setNote((res.output || 'ok').slice(0, 80))
+              }
+            } else setNote((res && res.error) || '失败')
             refresh()
           }).catch((e) => setNote('失败: ' + String(e && e.message ? e.message : e)))
         }
@@ -54,6 +59,7 @@ return {
 
         function toolRow(arm) {
           const current = cur(arm)
+          // 按钮由能力仓库清单(repo)动态渲染: 加新末端只需放 repo 目录, 不改客户端(§10.7 原则 1).
           function toolBtn(cap, version) {
             const active = current !== null && current.cap === cap && current.version === version
             return b(cap + version, function () {
@@ -63,9 +69,7 @@ return {
           }
           return React.createElement('div', { key: arm, style: rowStyle },
             React.createElement('span', { style: { fontWeight: 'bold', width: '40px' } }, '臂 ' + arm),
-            toolBtn('grasp', '1.0.0'),
-            toolBtn('grasp', '1.1.0'),
-            toolBtn('suction', '1.0.0'),
+            ...((state.repo || []).map(function (item) { return toolBtn(item.cap, item.version) })),
             b('去拿小球', function () { askAgent(arm) }, btnGo)
           )
         }
