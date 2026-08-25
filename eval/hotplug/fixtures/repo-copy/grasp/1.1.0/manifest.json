@@ -1,0 +1,9 @@
+{
+  "grasp": {
+    "name": "grasp",
+    "version": "1.1.0",
+    "description": "夹爪能力 v2: 返回文本带 [v2] 标记(换版/回滚验证用)",
+    "tool": "host.js",
+    "sha256": "cf4069f2dd8e364d8412cc11cd9c02d6b793166e532b6becd79f9001a631ea53"
+  }
+}
