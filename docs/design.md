@@ -107,12 +107,15 @@ The hot-plugged object is the **strategy-bearing end-effector capability instanc
 
 | Question | Answer |
 |---|---|
-| **May** this end-effector be mounted (integrity / provenance) | mount_guard: host.js sha256 vs manifest; mismatch → reject |
+| **May** this end-effector be mounted (integrity / provenance) | mount_guard: host.js sha256 vs manifest; mismatch → reject (implemented as inline sha256 in the mount service) |
 | What is this arm **allowed** to mount | rule table in the mount service: allowed end-effector types per arm + same-arm dedup/replace rules |
 | What is mounted now | per-arm records {arm, cap, version, instance handle} |
 | **Where** it lands, when it lives/dies, who sees it | the scope (arm layer), not the rule table |
 
 The table only says allow/reject and never holds instances. Order: sha256 → rule table → landing (arm-scope registration).
+The single source of truth for the logical arm list is the mount service row's `config.arms` (default A/B);
+the panel, the arm manager's scope creation, and mount/unmount validation all follow `list().arms`
+dynamically (extending physical arms additionally requires model + contract changes).
 
 ### 7.4 The agent's role: perception & adaptation
 
@@ -279,8 +282,7 @@ ros-hotplug-by-dsh/
 ├── src/
 │   ├── capabilities/              # ★ capability repo + mount service + spec
 │   │   ├── capability-spec.md     #    capability dev spec (template + manifest + mount flow)
-│   │   ├── mount_guard.py         #    pre-mount hash verification (zero-trust)
-│   │   ├── mount_service/         #    capability mount service (host-resident: admission + arm bookkeeping; web panel included)
+│   │   ├── mount_service/         #    capability mount service (host-resident: admission (inline sha256 guard) + arm bookkeeping; web panel included)
 │   │   ├── repo/                  #    capability repo directory (first-class deliverable): grasp/1.0.0/{host.js, manifest.json} ...
 │   │   └── pack.sh                #    optional distribution shell: repo dir → npm tarball
 │   ├── packages/                   #    out-of-tree npm packages (installed into profile node_modules)

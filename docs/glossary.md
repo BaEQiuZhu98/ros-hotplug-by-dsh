@@ -40,7 +40,7 @@
 | arm_status / take_object | the agent's two tools: perceive whether an arm is ready / have the arm take the object (strategy inside the instance) | hardware-difference shielding |
 | mount / unmount | the mount service registers/deregisters a capability instance on an arm context (scope) at runtime (`ctx.plugin` / `fiber.dispose`) | mount service + arm manager |
 | manifest | capability metadata + code hash | used by the pre-mount check |
-| mount guard | the gate that verifies the hash before mounting (zero-trust) | `src/capabilities/mount_guard.py` |
+| mount guard | the gate that verifies the hash before mounting (zero-trust) | `src/capabilities/mount_service/host.js` (inline sha256 in `loadPlugin`) |
 | zero-trust / hash check | treat every mount as untrusted; verify before mounting | tampered manifest → rejected |
 | signature (extension) | prove "truly from someone" = encrypt the hash | the "cloud sign/encrypt → device verify/decrypt" bonus |
 | multi-version coexistence (active/standby) | several version directories of one capability coexist | arms can mount different versions |

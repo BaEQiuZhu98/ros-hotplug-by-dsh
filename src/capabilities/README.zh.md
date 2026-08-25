@@ -9,8 +9,8 @@ agent 只经 arm_status/take_object 感知与执行, 不感知末端实现细节
 | 文件/目录 | 作用 |
 |---|---|
 | `capability-spec.md` | 能力开发规范(模板 + manifest + 挂载体系契约 + 版本策略) |
-| `mount_guard.py` | 挂载前哈希校验(零信任; 挂载服务准入第一步) |
-| `mount_service/` | 能力挂载服务(host 常驻: 准入检查 + 臂管理; 含 web 面板 host/client) |
+| 挂载守卫(mount_guard) | 挂载前哈希校验(零信任; 实现在 `mount_service/host.js` 的 `loadPlugin()` 内联 sha256 比对, 挂载服务准入第一步) |
+| `mount_service/` | 能力挂载服务(host 常驻: 准入检查 + 臂管理; web 面板为树外包包 `src/packages/cap-mount-panel`) |
 | `repo/` | 能力仓库目录(一等交付件): `repo/<cap>/<version>/{host.js, manifest.json}`, host.js 零依赖 |
 | `pack.sh` | 可选发布外壳: 仓库目录打包成 npm tarball(公开分发用) |
 

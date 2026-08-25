@@ -80,6 +80,10 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 | `reset()` | `/reset_command` | `"reset"` | - |
 | `query_capabilities()` | 订阅 `/joint_state` | - | 解析 §3.4 JSON, 返回能力集 |
 
+> 注: 本契约的 arm ∈ {A, B} 是**物理层**双臂事实(sim_bridge 模型)。DSH 侧的逻辑臂清单
+> 由挂载服务组合行 `config.arms` 下发(默认 A/B), 面板/臂管理器/挂卸校验动态跟随; 扩展
+> 物理臂时需同步扩展模型与契约。
+
 校验规则: 非法输入在 SDK 层直接拒绝, 返回 `{"ok": false, "error": "<原因>"}`,
 **不进入 ROS2**; 因此能力开发者(DSh 插件 host)免写校验.
 

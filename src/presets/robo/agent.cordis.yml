@@ -2,7 +2,7 @@
 #
 # 组成:
 #   1. persona: 「感知末端状态(仅 ready), 自适应决策, 不做低层控制, 不感知末端型号」.
-#   2. 臂管理器(robo-arm-manager, 树外包包形态): 预建 armA/armB 作用域 + arm_status/take_object 工具.
+#   2. 臂管理器(robo-arm-manager, 树外包包形态): 按挂载服务全局臂清单预建臂作用域 + arm_status/take_object 工具.
 #   3. robo-observer(preset 自带文件, 相对路径): 订阅 tools/change 汇报能力集.
 #   4. skills/: 机器人能力自适应技能, 随 preset 走.
 #

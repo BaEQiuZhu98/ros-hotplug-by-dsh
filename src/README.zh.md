@@ -8,7 +8,7 @@
 
 | 目录 | 内容 |
 |---|---|
-| `capabilities/` | 能力仓库(`repo/`) + 挂载服务(`mount_service/`, 准入 + 臂管理 + web 面板) + 规范 + `mount_guard.py` + `pack.sh` |
+| `capabilities/` | 能力仓库(`repo/`) + 挂载服务(`mount_service/`, 准入 + 臂管理 + web 面板) + 规范 + `pack.sh` |
 | `presets/robo/` | 机器人任务 agent preset(persona + observer + 臂管理器 + arm_status/take_object + skills) |
 | `ros2/sim_bridge/` | Python 仿真桥(双臂 MuJoCo, 订阅 tool_config/touch_command/ball_position/reset_command, 发布 /joint_state) |
 | `ros2/cpp_control/` | C++ 高频控制循环(1 kHz PID + 频率/抖动/耗时实测) |

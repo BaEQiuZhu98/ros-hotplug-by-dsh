@@ -49,10 +49,14 @@ EOF
 fi
 
 # 1. 挂载服务行(幂等): 已存在则跳过, 否则追加到 profile 的 patch 层.
-# loader 可能把用户 patch 写回为 "[]"(空列表): 视为无挂载服务行, 重新写入.
+# loader 可能把用户 patch 写回为 "[]"(空列表): 视为无挂载服务行, 清空后重新写入
+# (不残留空列表条目, 保持 patch 文件干净).
 if [ -f "$PATCH_FILE" ] && grep -q 'id: capability-mount-service' "$PATCH_FILE" && ! grep -q '^\[\]$' "$PATCH_FILE"; then
   echo "挂载服务行已存在于 $PATCH_FILE, 跳过写入(如需改路径请手工更新该行 config)."
 else
+  if grep -q '^\[\]$' "$PATCH_FILE" 2>/dev/null; then
+    rm -f "$PATCH_FILE"
+  fi
   if [ -f "$PATCH_FILE" ]; then
     echo "" >> "$PATCH_FILE"
   else
@@ -71,6 +75,7 @@ HEADER
       repo: $REPO/src/capabilities/repo
       workdir: $REPO
       python: $PYTHON
+      arms: [A, B]
 EOF
   echo "挂载服务行已写入 $PATCH_FILE"
 fi
@@ -112,3 +117,6 @@ echo "4. 机器人侧(另开终端):"
 echo "   ros2 launch rosbridge_server rosbridge_websocket_launch.xml"
 echo "   source /opt/ros/humble/setup.bash && source $(dirname "$PYTHON")/activate && python3 $REPO/src/ros2/sim_bridge/sim_bridge/two_arm_server.py --view"
 echo "5. 在「机器人任务」会话页面用面板装/卸末端, 点「去拿小球」交给 agent 决策执行."
+echo ""
+echo "注意: 机械臂清单的唯一来源是挂载服务行的 config.arms(默认 A/B);"
+echo "已有安装若该字段缺失, 挂载服务回退默认 A/B, 行为不变; 需要多臂时改 patch 行后重启."

@@ -157,6 +157,13 @@ def daemon_main():
         line = line.strip()
         if not line:
             continue
+        # 断线重连(T-A-26): rosbridge 重启/闪断后 roslibpy 客户端不会自动恢复服务,
+        # 持续返回"未连接". 这里检测连接断开即输出明确错误行并退出进程,
+        # 由挂载服务的 daemon 状态机(exit 事件)在下一次调用时重建 daemon 并重新连接.
+        if bridge.client is None or not bridge.client.is_connected:
+            print(json.dumps({'ok': False, 'error': '未连接 rosbridge, 请先 connect()'},
+                             ensure_ascii=False), flush=True)
+            sys.exit(1)
         try:
             req = json.loads(line)
         except Exception as e:
@@ -187,7 +194,9 @@ if __name__ == '__main__':
     import sys as _sys
 
     if len(_sys.argv) < 2:
-        print('用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|reset|query_capabilities|daemon>')
+        # 失败路径统一输出 JSON(契约 §5, T-A-28): 参数不足也是 {ok:false} + 退出码 1.
+        print(json.dumps({'ok': False, 'error': '用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|reset|query_capabilities|daemon>'},
+                         ensure_ascii=False))
         _sys.exit(1)
     method = _sys.argv[1]
     if method == 'daemon':

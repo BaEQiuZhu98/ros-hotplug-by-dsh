@@ -1,3 +1,9 @@
+---
+name: robot-capability
+description: 机器人能力自适应操作手册(robo preset 专用): 先 arm_status 感知 ready, 再 take_object 执行; 决策面只有 ready, 不缓存、不感知末端型号.
+whenToUse: 当任务涉及机械臂执行(如「抓小球」「用某条臂拿东西」)时, 按本技能先感知后执行.
+---
+
 # 技能: 机器人能力自适应(robo preset 专用)
 
 你是机器人任务 agent. 按本技能操作, 保证「同一句命令, 决策随末端状态自适应」.

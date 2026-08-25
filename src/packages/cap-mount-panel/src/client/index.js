@@ -1,11 +1,9 @@
 // cap-mount-panel client 半部 - 末端能力面板(架构 v2, 树外包持久化形态).
 //
-// 与 src/capabilities/mount_service/panel.client.js 语义完全一致(动态插件演示形态),
-// 差异只在通道: 动态插件用包私有 host.call, 树外包用同源 fetch 调
-// host 半部的 /cap-mount/* 路由(见 src/index.js). React 经模块表基线
+// 通道: 同源 fetch 调 host 半部的 /cap-mount/* 路由(见 src/index.js). React 经模块表基线
 // require('react') 获取(tsdown 把它保留为外部依赖).
 //
-// UI: 输入区上方两行(臂 A/B), 每行按能力仓库清单动态渲染按钮 toggle
+// UI: 输入区上方按挂载服务全局臂清单(默认 A/B)渲染行, 每行按能力仓库清单动态渲染按钮 toggle
 //     (点选生效/再点取消, 当前挂载高亮) + 「去拿小球」(把消息发给 agent, 由 agent 判断).
 //     标题行: 「刷新」「全部复位」.
 import React from 'react'
@@ -18,7 +16,7 @@ export function apply(ctx) {
   slots.inject('conversation.input.dock', () => slots.register(
     { name: 'conversation.input.dock', id: 'cap-mount-panel', order: 16, label: '末端能力' },
     (props) => {
-      const [state, setState] = React.useState({ repo: [], mounted: [] })
+      const [state, setState] = React.useState({ repo: [], mounted: [], arms: [] })
       const [note, setNote] = React.useState('')
 
       // 同源 RPC: 与 host 半部的 /cap-mount/<method> 路由一一对应.
@@ -88,6 +86,9 @@ export function apply(ctx) {
         )
       }
 
+      // 臂行清单: 来自挂载服务全局臂清单(审查 v3: 去 A/B 硬编码); 空清单回退默认 A/B 保证兼容.
+      const rowArms = Array.isArray(state.arms) && state.arms.length > 0 ? state.arms : ['A', 'B']
+
       return React.createElement('div', { style: { fontSize: '12px', padding: '4px 0' } },
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } },
           React.createElement('span', { style: { fontWeight: 'bold' } }, '末端能力(装/卸面板, 拿小球交给 agent)'),
@@ -95,8 +96,7 @@ export function apply(ctx) {
           b('刷新', function () { refresh() }),
           b('全部复位', function () { call('reset_all', {}) }, btnRst)
         ),
-        toolRow('A'),
-        toolRow('B')
+        ...rowArms.map(function (arm) { return toolRow(arm) })
       )
     }
   ))

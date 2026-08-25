@@ -11,14 +11,14 @@
 | `preset.yml` | preset 显示元数据(name/description) |
 | `agent.cordis.yml` | 组合: persona + observer + 臂管理器 + arm_status/take_object + skills 挂载 |
 | `src/observer.js` | 观测插件: 订阅 tools/change + 能力集汇报(零依赖) |
-| `skills/robot-capability.zh.md` | 技能: 感知/决策/执行的操作手册 |
+| `skills/robot-capability.zh.md` | 技能(带 frontmatter, 经 skill-filesystem 注册): 感知/决策/执行的操作手册 |
 | `install.sh` | 安装到 `$DSH_HOME/.agent-presets/robo` |
 
 ## 职责边界(设计 §7.4/§7.11)
 
 - **agent 只感知 ready、只调 take_object**: 不知道夹爪/吸盘, 不装配末端, 不做低层控制.
-- **臂管理器(会话内)**: 预建 armA/armB 两个臂作用域(createScope)并注册臂上下文; 实例的挂/卸由挂载服务在臂上下文上执行;
-  挂载命令来自面板(经挂载服务), 臂层实例随会话生灭.
+- **臂管理器(会话内)**: 按挂载服务的全局臂清单(默认 A/B)预建臂作用域(createScope)并注册臂上下文;
+  实例的挂/卸由挂载服务在臂上下文上执行; 挂载命令来自面板(经挂载服务), 臂层实例随会话生灭.
 - **面板(唯一写者)**: 装/卸末端 + 把「去拿小球」指令发给 agent.
 
 ## 验证路径(设计 §7.12, 同一句「抓小球」)

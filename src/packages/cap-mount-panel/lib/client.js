@@ -41,7 +41,8 @@ window.__ModuleLoader__.load({
 			}, (props) => {
 				const [state, setState] = react.default.useState({
 					repo: [],
-					mounted: []
+					mounted: [],
+					arms: []
 				});
 				const [note, setNote] = react.default.useState("");
 				function rpc(method, args) {
@@ -156,6 +157,7 @@ window.__ModuleLoader__.load({
 						askAgent(arm);
 					}, btnGo));
 				}
+				const rowArms = Array.isArray(state.arms) && state.arms.length > 0 ? state.arms : ["A", "B"];
 				return react.default.createElement("div", { style: {
 					fontSize: "12px",
 					padding: "4px 0"
@@ -168,7 +170,9 @@ window.__ModuleLoader__.load({
 					refresh();
 				}), b("全部复位", function() {
 					call("reset_all", {});
-				}, btnRst)), toolRow("A"), toolRow("B"));
+				}, btnRst)), ...rowArms.map(function(arm) {
+					return toolRow(arm);
+				}));
 			}));
 		}
 		//#endregion

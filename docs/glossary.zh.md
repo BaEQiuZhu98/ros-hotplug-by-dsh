@@ -42,7 +42,7 @@
 | 能力（capability）/ 能力实例 | 末端硬件 + 驱动策略的完整单元（grasp = 夹取策略, suction = 吸附策略） | 带策略实例, 挂臂作用域 |
 | 挂载 / 卸载 | 挂载服务在臂上下文(作用域)上运行时注册/撤销能力实例（`ctx.plugin` / `fiber.dispose`，不重启） | `mount_service` + 臂管理器 |
 | manifest | 能力元数据 + 代码哈希 | 挂载前校验用 |
-| 挂载守卫（mount_guard） | 挂载前验哈希的闸（零信任） | `src/capabilities/mount_guard.py` |
+| 挂载守卫（mount_guard） | 挂载前验哈希的闸（零信任） | `src/capabilities/mount_service/host.js`（`loadPlugin()` 内联 sha256 比对） |
 | 零信任 / 哈希校验 | 每次挂载都假设不可信，先验身再上机 | 篡改 manifest → 拒绝挂载 |
 | 签名（扩展） | 证明「确实出自某人」，= 对哈希加密 | 「云端签名/加密 → 设备验签/解密」的加分项 |
 | 多版本共存（主备） | 同一能力多个版本目录并存、互不覆盖 | repo 下 v1/v2/v3 目录 |

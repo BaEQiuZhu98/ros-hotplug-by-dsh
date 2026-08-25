@@ -13,7 +13,8 @@
 - **唯一写者 = 人**: 挂载/卸载只经 web 面板 RPC → 能力挂载服务; agent 的工具表里没有挂/卸工具.
 - **热插拔 = DSH 的运行时挂载机制**: 挂载服务在臂管理器注册的**臂上下文(作用域)**上执行 `ctx.plugin(...)` / `fiber.dispose()`,
   插入即见、拔出即回收, 全程不重启.
-- **准入检查(配置表, 不是作用域)**: 每次挂载前 mount_guard 对 host.js 重算 SHA256 与 manifest 比对,
+- **准入检查(配置表, 不是作用域)**: 每次挂载前挂载守卫(mount_guard, 实现在
+  `mount_service/host.js` 的 `loadPlugin()`)对 host.js 重算 SHA256 与 manifest 比对,
   再经挂载服务的规则表(该臂允许的末端类型 / 同臂防重 / 替换规则).
 
 ## 2. 能力目录模板(以 grasp 为例)
