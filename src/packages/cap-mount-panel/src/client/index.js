@@ -1,10 +1,11 @@
-// cap-mount-panel client 半部 - 末端能力面板(架构 v2, 树外包持久化形态).
+// cap-mount-panel client 半部 - 能力面板(架构 v2 + 感知槽扩展, 树外包持久化形态).
 //
 // 通道: 同源 fetch 调 host 半部的 /cap-mount/* 路由(见 src/index.js). React 经模块表基线
 // require('react') 获取(tsdown 把它保留为外部依赖).
 //
-// UI: 输入区上方按挂载服务全局臂清单(默认 A/B)渲染行, 每行按能力仓库清单动态渲染按钮 toggle
-//     (点选生效/再点取消, 当前挂载高亮) + 「去拿小球」(把消息发给 agent, 由 agent 判断).
+// UI: 输入区上方渲染 ① 末端区: 按挂载服务全局臂清单(默认 A/B)每臂一行, 挂/卸 end-effector
+//     类能力 + 「去拿小球」(把消息发给 agent, 由 agent 判断); ② 感知区: 一行, 挂/卸 sensor
+//     类能力(按 manifest kind 分组渲染; 挂载是时间点操作, 只作用于已存在会话).
 //     标题行: 「刷新」「全部复位」.
 import React from 'react'
 
@@ -14,9 +15,9 @@ export function apply(ctx) {
   const slots = ctx.get('slots')
   if (slots === undefined) return
   slots.inject('conversation.input.dock', () => slots.register(
-    { name: 'conversation.input.dock', id: 'cap-mount-panel', order: 16, label: '末端能力' },
+    { name: 'conversation.input.dock', id: 'cap-mount-panel', order: 16, label: '能力面板' },
     (props) => {
-      const [state, setState] = React.useState({ repo: [], mounted: [], arms: [] })
+      const [state, setState] = React.useState({ repo: [], mounted: [], slots: [], arms: [] })
       const [note, setNote] = React.useState('')
 
       // 同源 RPC: 与 host 半部的 /cap-mount/<method> 路由一一对应.
@@ -31,9 +32,12 @@ export function apply(ctx) {
       function cur(arm) {
         return (state.mounted || []).find((m) => m.arm === arm) || null
       }
+      function curSlot(slot) {
+        return (state.slots || []).find((s) => s.slot === slot) || null
+      }
       function refresh() {
         rpc('cap_list', {}).then((res) => {
-          if (res && res.mounted) setState(res)
+          if (res && res.repo) setState(res)
           else setNote((res && res.error) || '查询失败')
         }).catch((e) => setNote('失败: ' + String(e && e.message ? e.message : e)))
       }
@@ -71,7 +75,7 @@ export function apply(ctx) {
 
       function toolRow(arm) {
         const current = cur(arm)
-        // 按钮由能力仓库清单(repo)动态渲染: 加新末端只需放 repo 目录, 不改客户端(§10.7 原则 1).
+        // 按钮由能力仓库清单(repo)动态渲染(仅 end-effector 类): 加新末端只需放 repo 目录.
         function toolBtn(cap, version) {
           const active = current !== null && current.cap === cap && current.version === version
           return b(cap + version, function () {
@@ -81,8 +85,26 @@ export function apply(ctx) {
         }
         return React.createElement('div', { key: arm, style: rowStyle },
           React.createElement('span', { style: { fontWeight: 'bold', width: '40px' } }, '臂 ' + arm),
-          ...((state.repo || []).map(function (item) { return toolBtn(item.cap, item.version) })),
+          ...((state.repo || []).filter(function (item) { return item.kind !== 'sensor' })
+            .map(function (item) { return toolBtn(item.cap, item.version) })),
           b('去拿小球', function () { askAgent(arm) }, btnGo)
+        )
+      }
+
+      function perceptionRow() {
+        const slot = 'perception'
+        const current = curSlot(slot)
+        const sensors = (state.repo || []).filter(function (item) { return item.kind === 'sensor' })
+        if (sensors.length === 0) return null
+        return React.createElement('div', { style: rowStyle },
+          React.createElement('span', { style: { fontWeight: 'bold', width: '40px' } }, '感知'),
+          ...sensors.map(function (item) {
+            const active = current !== null && current.cap === item.cap && current.version === item.version
+            return b(item.cap + item.version, function () {
+              if (active) call('slot_unmount', { slot: slot })
+              else call('slot_mount', { slot: slot, cap: item.cap, version: item.version })
+            }, active ? btnOn : btn)
+          })
         )
       }
 
@@ -91,12 +113,13 @@ export function apply(ctx) {
 
       return React.createElement('div', { style: { fontSize: '12px', padding: '4px 0' } },
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } },
-          React.createElement('span', { style: { fontWeight: 'bold' } }, '末端能力(装/卸面板, 拿小球交给 agent)'),
+          React.createElement('span', { style: { fontWeight: 'bold' } }, '能力面板(装/卸末端与感知, 拿小球交给 agent)'),
           note ? React.createElement('span', { style: { color: '#b45309' } }, note) : null,
           b('刷新', function () { refresh() }),
           b('全部复位', function () { call('reset_all', {}) }, btnRst)
         ),
-        ...rowArms.map(function (arm) { return toolRow(arm) })
+        ...rowArms.map(function (arm) { return toolRow(arm) }),
+        perceptionRow()
       )
     }
   ))

@@ -35,7 +35,7 @@
 |---|---|
 | **机制** | DSH 的分层作用域 + 父链继承 + nearest-wins + `isolate` realm + Cordis `dispose` + 版本时序（plugin/package/run） |
 | **场景** | 具身机器人的能力热插拔：末端执行器（夹爪 ↔ 吸盘）、传感器、技能的运行时增删换 |
-| **实现** | 可复现的 `demo/13-hotplug`（及源码工程 `src/`），含可靠性设计与评测 |
+| **实现** | 可复现的 `demo/13-hotplug`（末端执行器类）与 `demo/14`（传感器类, 视觉感知热插拔）（及源码工程 `src/`），含可靠性设计与评测 |
 
 ### 4.3 明确不主张（边界）
 
@@ -84,20 +84,22 @@
 
 层 1  agent(任务 agent)      robo preset 挂载(每会话)
    ├─ persona                  「感知末端状态, 自适应决策, 不做低层控制, 不感知末端实现细节」
-   ├─ 臂管理器                  会话内预建 armA、armB 作用域并注册臂上下文, 提供 arm_status/take_object
+   ├─ 臂管理器                  会话内预建 armA、armB 作用域与感知槽并注册上下文, 提供 arm_status/take_object
    ├─ observer                  订阅 tools/change, 汇报能力集(观测能力)
    ├─ arm_status 工具           感知入口: 某臂是否具备可用末端
-   └─ take_object 工具          执行入口: 让某臂去拿东西(策略由末端实例决定)
+   ├─ take_object 工具          执行入口: 让某臂去拿东西(策略由末端实例决定)
+   └─ 感知槽(perception, 标签 = agent key 本身)   sensor 类能力挂载点: detect_ball 对 agent 可见;
+                                                  其拦截器沿父链命中臂层事件(视觉注入执行链)
 
-层 2  机械臂 armA / armB     createScope(agentCtx, 'armA' / 'armB'), 会话创建时预建(空层)
-   └─ 该臂的末端能力实例(挂/卸都发生在这层)
+层 2  机械臂 armA / armB     createScope(armManagerCtx, armKey, { parent: 会话 agent 作用域 }), 会话创建时预建(空层)
+   └─ 该臂的末端能力实例(挂/卸都发生在这层; 对 agent 不可见——父不视子)
 
 层 3  末端实例              带策略能力插件(§10.3), 挂在臂层上:
    ├─ armA 挂 grasp  -> 夹取策略实例(同名注册 manipulate)
    └─ armB 挂 suction -> 吸附策略实例(同名注册 manipulate)
 ```
 
-热插拔的对象 = **带策略的末端能力实例**, 在臂作用域上生灭; 同名实例靠作用域隔离, 互不串台.
+热插拔的对象 = **带策略的能力实例**(末端挂臂层、传感器挂感知槽), 在注册的上下文上生灭; 同名实例靠作用域隔离, 互不串台. 事件沿父链向上冒泡(臂层发出的执行链事件经 agent 层被感知槽拦截器命中), 工具/服务可见性沿父链向下继承——两条方向相反的语义共同构成分层(基准见 `.dsh/vision-hotplug-scenario-design.md`)。
 
 ### 7.2 作用域与可见性
 

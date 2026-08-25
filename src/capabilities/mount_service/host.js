@@ -6,10 +6,12 @@
 // (人的唯一写入口)经 RPC 调用; 不注册任何 agent 工具.
 //
 //   registerArms({A: ctx, B: ctx})  臂管理器(会话内)注册臂上下文(臂名须在 config.arms 内); 多会话注册各自追加
-//   mount(cap, version, {arm})      准入检查 -> 动态 import -> 在 arm 对应上下文中 ctx.plugin
-//                                   -> 同臂防重(同 cap@version 拒绝), 同臂换挂先卸载(替换)
-//   unmount(arm)                    该臂全部上下文上的实例 fiber.dispose(只回收本臂)
-//   list()                          {repo, mounted: [{arm, cap, version}]}
+//   registerSlot(slot, ctx)         臂管理器注册感知槽上下文(sensor 类能力挂载点, 标签 = agent key)
+//   mount(cap, version, {arm|slot}) 准入检查 -> 动态 import -> 按 kind 路由到臂/槽上下文 ctx.plugin
+//                                   -> 同点防重(同 cap@version 拒绝), 同点换挂先卸载(替换)
+//   unmount(arm) / unmountSlot(slot) 该点全部上下文上的实例 fiber.dispose(只回收本点)
+//   scopedWaterfall(armCtx, name, args, next)  作用域化事件织入助手(能力实例零依赖下的跨层拦截通道)
+//   list()                          {repo: [{cap, version, kind}], mounted, slots, arms}
 //
 // 臂间独立: 不同臂可挂同名能力(实例同名 manipulate, 靠臂作用域隔离, 互不串台).
 import { createHash } from 'node:crypto'
@@ -176,7 +178,7 @@ export function apply(ctx, config = {}) {
     return createHash('sha256').update(readFileSync(file)).digest('hex')
   }
 
-  // 仓库清单: repo/<cap>/<version>/manifest.json.
+  // 仓库清单: repo/<cap>/<version>/manifest.json(条目带 kind, 缺省 end-effector).
   function listRepo() {
     const out = []
     if (!existsSync(repo)) return out
@@ -184,7 +186,17 @@ export function apply(ctx, config = {}) {
       const capDir = join(repo, cap)
       if (!existsSync(join(capDir))) continue
       for (const ver of readdirSync(capDir)) {
-        if (existsSync(join(capDir, ver, 'manifest.json'))) out.push({ cap, version: ver })
+        const manifestFile = join(capDir, ver, 'manifest.json')
+        if (existsSync(manifestFile)) {
+          let kind = 'end-effector'
+          try {
+            const m = JSON.parse(readFileSync(manifestFile, 'utf8'))
+            kind = (m[cap] && m[cap].kind) || 'end-effector'
+          } catch (e) {
+            // manifest 不可解析时不阻断清单(准入在挂载时拒绝).
+          }
+          out.push({ cap, version: ver, kind })
+        }
       }
     }
     return out.sort()
@@ -208,13 +220,17 @@ export function apply(ctx, config = {}) {
     if (!entry || !entry.sha256) {
       return { ok: false, error: 'manifest 缺少 ' + cap + ' 的 sha256 字段' }
     }
+    const kind = entry.kind || 'end-effector'
+    if (!['end-effector', 'sensor', 'skill'].includes(kind)) {
+      return { ok: false, error: 'manifest 的 kind 非法: ' + kind }
+    }
     const actual = sha256(hostFile)
     if (actual !== entry.sha256) {
       return { ok: false, error: '拒绝挂载: 哈希不匹配! 期望 ' + entry.sha256.slice(0, 16) + '... 实际 ' + actual.slice(0, 16) + '... (代码被篡改?)' }
     }
     try {
       const plugin = await import(pathToFileURL(hostFile).href + '?v=' + Date.now())
-      return { ok: true, plugin }
+      return { ok: true, plugin, kind }
     } catch (e) {
       return { ok: false, error: '加载 host.js 失败: ' + e.message }
     }
@@ -269,6 +285,40 @@ export function apply(ctx, config = {}) {
     }
   }
 
+  // 感知槽(场景扩展): slot -> [ctx...]  smer 类能力挂载点(标签 = agent key, 每会话一套).
+  const slotContexts = new Map()
+  // slot -> {cap, version, fibers, plugin}  槽位当前挂载.
+  const slotsBySlot = new Map()
+
+  function registerSlot(slot, ctx) {
+    if (typeof slot !== 'string' || slot === '') return { ok: false, error: '非法槽位名' }
+    const list = slotContexts.get(slot) ?? []
+    list.push(ctx)
+    slotContexts.set(slot, list)
+    console.log('[cap-mount-service] 感知槽上下文注册: %s=%d 套', slot, list.length)
+    return function unregisterSlot() {
+      const cur = slotContexts.get(slot)
+      if (cur === undefined) return
+      const index = cur.indexOf(ctx)
+      if (index !== -1) cur.splice(index, 1)
+      console.log('[cap-mount-service] 感知槽上下文注销: %s=%d 套', slot, cur.length)
+    }
+  }
+
+  // 作用域化事件织入助手(P1): 实现由臂管理器注入(臂管理器是 profile 包, 可解析
+  // dsh-scope; 本服务零 import, 能力实例经本助手零依赖发射). 事件只沿臂作用域的
+  // 祖先链路由(多会话天然隔离, 反向不成立). 未注入时(理论上仅臂管理器未加载)直接报错.
+  let scopedWaterfallImpl = null
+  function attachScopedWaterfall(fn) {
+    if (typeof fn === 'function') scopedWaterfallImpl = fn
+  }
+  function scopedWaterfall(armCtx, name, args, next) {
+    if (scopedWaterfallImpl === null) {
+      throw new Error('scopedWaterfall 助手未注入(臂管理器尚未加载)')
+    }
+    return scopedWaterfallImpl(armCtx, name, args, next)
+  }
+
   async function doUnmount(arm) {
     const cur = armsByArm.get(arm)
     if (!cur) return { ok: false, error: '臂 ' + arm + ' 没有挂载末端' }
@@ -295,6 +345,7 @@ export function apply(ctx, config = {}) {
 
   // 导出面: 校验后入队. 臂名合法性只看全局臂清单 config.arms(审查 v3: 去 A/B 硬编码).
   async function mount(cap, version, options = {}) {
+    if (options.slot !== undefined) return mountSlot(cap, version, options)
     const arm = options.arm
     if (typeof arm !== 'string' || !armContexts.has(arm)) return { ok: false, error: '非法机械臂: ' + (arm || '(未指定)') }
     return enqueueArm(arm, () => doMount(cap, version, options))
@@ -303,6 +354,83 @@ export function apply(ctx, config = {}) {
   async function unmount(arm) {
     if (typeof arm !== 'string' || !armContexts.has(arm)) return { ok: false, error: '非法机械臂: ' + (arm || '(未指定)') }
     return enqueueArm(arm, () => doUnmount(arm))
+  }
+
+  // 感知槽挂载路径(sensor 类): 准入链与臂路径同构, kind 不匹配直接拒绝.
+  const slotQueues = new Map()
+  function enqueueSlot(slot, work) {
+    const prev = slotQueues.get(slot) ?? Promise.resolve()
+    const next = prev.then(work, work)
+    slotQueues.set(slot, next.catch(() => {}))
+    return next
+  }
+
+  async function mountSlot(cap, version, options = {}) {
+    const slot = String(options.slot)
+    if (!slotContexts.has(slot)) return { ok: false, error: '未知槽位: ' + slot }
+    return enqueueSlot(slot, () => doMountSlot(cap, version, options))
+  }
+
+  async function doMountSlot(cap, version, options = {}) {
+    const slot = String(options.slot)
+    const loaded = await loadPlugin(cap, version)
+    if (!loaded.ok) return loaded
+    if (loaded.kind !== 'sensor') {
+      return { ok: false, error: '槽位类型不匹配: ' + cap + '@' + version + ' 是 ' + loaded.kind + ', 感知槽只接受 sensor' }
+    }
+    const contexts = slotContexts.get(slot) ?? []
+    if (contexts.length === 0) {
+      return { ok: false, error: '槽位 ' + slot + ' 无上下文(请先创建「机器人任务」会话)' }
+    }
+    const cur = slotsBySlot.get(slot)
+    if (cur !== undefined && cur.cap === cap && cur.version === version) {
+      return { ok: false, error: '槽位 ' + slot + ' 已挂载 ' + cap + '@' + version + '(同槽重复挂载拒绝)' }
+    }
+    if (cur !== undefined) {
+      await doUnmountSlot(slot)
+    }
+    const fibers = []
+    for (const targetCtx of contexts) {
+      const r = await mountOnContext(targetCtx, loaded.plugin, slot)
+      if (!r.ok) {
+        for (const f of fibers) {
+          try { await f.dispose() } catch (e) { console.warn('[cap-mount-service] 槽部分挂载回收失败(%s, %s@%s): %s', slot, cap, version, e && e.message) }
+        }
+        if (cur !== undefined) {
+          const restored = []
+          for (const targetCtx of contexts) {
+            const rr = await mountOnContext(targetCtx, cur.plugin, slot)
+            if (rr.ok) restored.push({ dispose: rr.dispose })
+          }
+          if (restored.length > 0) {
+            slotsBySlot.set(slot, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
+            console.warn('[cap-mount-service] 槽 %s 换挂 %s@%s 失败, 已自动恢复旧能力 %s@%s', slot, cap, version, cur.cap, cur.version)
+            return { ok: false, error: r.error, restored: true }
+          }
+          console.error('[cap-mount-service] 槽 %s 换挂失败且旧能力 %s@%s 恢复失败', slot, cur.cap, cur.version)
+          return { ok: false, error: r.error + '(且旧能力恢复失败)', restored: false }
+        }
+        return { ok: false, error: r.error, restored: false }
+      }
+      fibers.push({ dispose: r.dispose })
+    }
+    slotsBySlot.set(slot, { cap, version, fibers, plugin: loaded.plugin })
+    return { ok: true, slot, cap, version }
+  }
+
+  async function unmountSlot(slot) {
+    if (!slotContexts.has(slot)) return { ok: false, error: '未知槽位: ' + slot }
+    return enqueueSlot(slot, () => doUnmountSlot(slot))
+  }
+
+  async function doUnmountSlot(slot) {
+    const cur = slotsBySlot.get(slot)
+    if (!cur) return { ok: false, error: '槽位 ' + slot + ' 没有挂载能力' }
+    for (const f of cur.fibers) {
+      try { await f.dispose() } catch (e) { console.warn('[cap-mount-service] 槽卸载回收失败(%s, %s@%s): %s', slot, cur.cap, cur.version, e && e.message) }
+    }
+    slotsBySlot.delete(slot)
+    return { ok: true, slot, cap: cur.cap, version: cur.version }
   }
 
   async function doMount(cap, version, options = {}) {
@@ -315,6 +443,9 @@ export function apply(ctx, config = {}) {
     // 准入先于任何卸载: 校验失败时旧挂载原封不动(失败回滚语义).
     const loaded = await loadPlugin(cap, version)
     if (!loaded.ok) return loaded
+    if (loaded.kind !== 'end-effector') {
+      return { ok: false, error: '挂载点类型不匹配: ' + cap + '@' + version + ' 是 ' + loaded.kind + ', 臂挂载点只接受 end-effector' }
+    }
     const contexts = armContexts.get(arm) ?? []
     if (contexts.length === 0) {
       return { ok: false, error: '臂 ' + arm + ' 没有臂上下文(请先创建「机器人任务」会话)' }
@@ -362,12 +493,17 @@ export function apply(ctx, config = {}) {
     return {
       repo: listRepo(),
       mounted: [...armsByArm.entries()].map(([arm, cur]) => ({ arm, cap: cur.cap, version: cur.version })),
+      slots: [...slotsBySlot.entries()].map(([slot, cur]) => ({ slot, cap: cur.cap, version: cur.version })),
       // 全局臂清单(审查 v3): 面板渲染与臂管理器建作用域都从这里取, 不再各自硬编码 A/B.
       arms: [...arms],
     }
   }
 
-  ctx.provide('capabilityMount', { registerArms, mount, unmount, list, env: () => ({ workdir, python }), bridge })
+  ctx.provide('capabilityMount', {
+    registerArms, registerSlot, scopedWaterfall, attachScopedWaterfall,
+    mount, unmount, unmountSlot,
+    list, env: () => ({ workdir, python }), bridge,
+  })
   console.log('[cap-mount-service] 已就绪, repo=%s, arms=%s', repo, arms.join(','))
 
   // 插件 dispose: 回收全部挂载.

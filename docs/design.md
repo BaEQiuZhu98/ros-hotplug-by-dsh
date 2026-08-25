@@ -37,7 +37,7 @@ Using DSH's spatiotemporal compositionality as the composition primitive for rob
 |---|---|
 | **Mechanism** | DSH layered scopes + parent-chain inheritance + nearest-wins + `isolate` realm + Cordis `dispose` + version timeline (plugin/package/run) |
 | **Scenario** | embodied-robot capability hot-plugging: end-effectors (gripper ↔ suction), sensors, skills |
-| **Implementation** | reproducible `demo/13-hotplug` (and the `src/` engineering), with reliability design and evaluation |
+| **Implementation** | reproducible `demo/13-hotplug` (end-effector class) and `demo/14` (sensor class, vision hot-plug) (and the `src/` engineering), with reliability design and evaluation |
 
 ### 4.3 Explicitly not claimed
 
@@ -81,20 +81,22 @@ layer 0  global (machine)        host-composition mounts, inherited by every age
 
 layer 1  agent (task agent)      robo preset mount (per session)
    ├─ persona                  "perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"
-   ├─ arm manager               pre-creates armA, armB scopes in-session, registers the arm contexts, provides arm_status/take_object
+   ├─ arm manager               pre-creates armA, armB scopes and the perception slot in-session, registers the contexts, provides arm_status/take_object
    ├─ observer                  subscribes to tools/change, reports the capability set
    ├─ arm_status tool           perception entry: is this arm ready (has a usable end-effector)
-   └─ take_object tool          execution entry: have this arm take the object (strategy inside the instance)
+   ├─ take_object tool          execution entry: have this arm take the object (strategy inside the instance)
+   └─ perception slot (label = the agent key itself)   mounting point for sensor-class capabilities: detect_ball is visible to the agent;
+                                                        its interceptor hits arm-layer events up the parent chain (vision feeds the execution chain)
 
-layer 2  arms armA / armB      createScope(agentCtx, 'armA' / 'armB'), pre-created empty at session start
-   └─ the arm's end-effector capability instance (mount/unmount happen on this layer)
+layer 2  arms armA / armB      createScope(armManagerCtx, armKey, { parent: session agent scope }), pre-created empty at session start
+   └─ the arm's end-effector capability instance (mount/unmount happen on this layer; invisible to the agent — parents do not see children)
 
 layer 3  end-effector instance  strategy-bearing capability plugin (§10.3), mounted on an arm layer:
    ├─ armA mounts grasp  -> grasp-strategy instance (registers same-name tool `manipulate`)
    └─ armB mounts suction -> suction-strategy instance (registers same-name tool `manipulate`)
 ```
 
-The hot-plugged object is the **strategy-bearing end-effector capability instance**, living and dying on an arm scope; same-name instances are isolated by scope and never cross-talk.
+The hot-plugged object is the **strategy-bearing capability instance** (end-effectors on arm layers, sensors on the perception slot), living and dying on its registered context; same-name instances are isolated by scope and never cross-talk. Events bubble up the parent chain (arm-layer execution-chain events hit the perception-slot interceptor via the agent layer), while tool/service visibility inherits down the parent chain — two opposite directions that together define the layering (baseline: `.dsh/vision-hotplug-scenario-design.md`).
 
 ### 7.2 Scopes & visibility
 

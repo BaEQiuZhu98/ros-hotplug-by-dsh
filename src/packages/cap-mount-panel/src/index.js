@@ -82,11 +82,27 @@ export function apply(ctx) {
             : { ok: false, output: JSON.stringify(ph) + ' | 回读校验: ' + verify.detail },
         }
       }
+      case 'slot_mount': {
+        // 感知槽挂载(sensor 类): 无物理装配(sensor 不改变物理末端), 直接返回挂载结果.
+        const slot = (args && args.slot) ? String(args.slot) : ''
+        const cap = String(args && args.cap)
+        const version = String(args && args.version)
+        if (!slot) return { ok: false, error: '缺少槽位参数' }
+        return svc.mount(cap, version, { slot })
+      }
+      case 'slot_unmount': {
+        const slot = (args && args.slot) ? String(args.slot) : ''
+        if (!slot) return { ok: false, error: '缺少槽位参数' }
+        return svc.unmountSlot(slot)
+      }
       case 'reset_all': {
         const arms = Array.isArray(svc.list().arms) ? svc.list().arms : []
         for (const arm of arms) {
           const r = await svc.unmount(arm)
           if (r.ok) await svc.bridge('set_tool', [arm, 'none'])
+        }
+        for (const slot of (svc.list().slots || []).map((s) => s.slot)) {
+          await svc.unmountSlot(slot)
         }
         const ph = await svc.bridge('reset', [])
         return { ok: true, output: '已全部复位', physical: { ok: ph.ok === true, output: JSON.stringify(ph) } }

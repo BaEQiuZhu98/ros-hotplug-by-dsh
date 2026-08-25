@@ -37,11 +37,12 @@ window.__ModuleLoader__.load({
 				name: "conversation.input.dock",
 				id: "cap-mount-panel",
 				order: 16,
-				label: "末端能力"
+				label: "能力面板"
 			}, (props) => {
 				const [state, setState] = react.default.useState({
 					repo: [],
 					mounted: [],
+					slots: [],
 					arms: []
 				});
 				const [note, setNote] = react.default.useState("");
@@ -57,9 +58,12 @@ window.__ModuleLoader__.load({
 				function cur(arm) {
 					return (state.mounted || []).find((m) => m.arm === arm) || null;
 				}
+				function curSlot(slot) {
+					return (state.slots || []).find((s) => s.slot === slot) || null;
+				}
 				function refresh() {
 					rpc("cap_list", {}).then((res) => {
-						if (res && res.mounted) setState(res);
+						if (res && res.repo) setState(res);
 						else setNote(res && res.error || "查询失败");
 					}).catch((e) => setNote("失败: " + String(e && e.message ? e.message : e)));
 				}
@@ -151,11 +155,35 @@ window.__ModuleLoader__.load({
 					}, react.default.createElement("span", { style: {
 						fontWeight: "bold",
 						width: "40px"
-					} }, "臂 " + arm), ...(state.repo || []).map(function(item) {
+					} }, "臂 " + arm), ...(state.repo || []).filter(function(item) {
+						return item.kind !== "sensor";
+					}).map(function(item) {
 						return toolBtn(item.cap, item.version);
 					}), b("去拿小球", function() {
 						askAgent(arm);
 					}, btnGo));
+				}
+				function perceptionRow() {
+					const slot = "perception";
+					const current = curSlot(slot);
+					const sensors = (state.repo || []).filter(function(item) {
+						return item.kind === "sensor";
+					});
+					if (sensors.length === 0) return null;
+					return react.default.createElement("div", { style: rowStyle }, react.default.createElement("span", { style: {
+						fontWeight: "bold",
+						width: "40px"
+					} }, "感知"), ...sensors.map(function(item) {
+						const active = current !== null && current.cap === item.cap && current.version === item.version;
+						return b(item.cap + item.version, function() {
+							if (active) call("slot_unmount", { slot });
+							else call("slot_mount", {
+								slot,
+								cap: item.cap,
+								version: item.version
+							});
+						}, active ? btnOn : btn);
+					}));
 				}
 				const rowArms = Array.isArray(state.arms) && state.arms.length > 0 ? state.arms : ["A", "B"];
 				return react.default.createElement("div", { style: {
@@ -166,13 +194,13 @@ window.__ModuleLoader__.load({
 					alignItems: "center",
 					gap: "8px",
 					marginBottom: "4px"
-				} }, react.default.createElement("span", { style: { fontWeight: "bold" } }, "末端能力(装/卸面板, 拿小球交给 agent)"), note ? react.default.createElement("span", { style: { color: "#b45309" } }, note) : null, b("刷新", function() {
+				} }, react.default.createElement("span", { style: { fontWeight: "bold" } }, "能力面板(装/卸末端与感知, 拿小球交给 agent)"), note ? react.default.createElement("span", { style: { color: "#b45309" } }, note) : null, b("刷新", function() {
 					refresh();
 				}), b("全部复位", function() {
 					call("reset_all", {});
 				}, btnRst)), ...rowArms.map(function(arm) {
 					return toolRow(arm);
-				}));
+				}), perceptionRow());
 			}));
 		}
 		//#endregion

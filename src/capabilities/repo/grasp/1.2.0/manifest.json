@@ -1,0 +1,10 @@
+{
+  "grasp": {
+    "name": "grasp",
+    "version": "1.2.0",
+    "kind": "end-effector",
+    "description": "夹爪末端: 夹取策略 + waterfall 执行链扩展点(盲/精准分支 + 命中判定)",
+    "tool": "host.js",
+    "sha256": "15205dffdc812293dbd2341b4cf830e34bcda41806ceb6fb9a0f8667e50d28b9"
+  }
+}

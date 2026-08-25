@@ -77,6 +77,13 @@ def ik_relative(dx, dy):
     return q1, q2
 
 
+def fk_absolute(q1, q2, base):
+    """二连杆 FK(契约 v1.2): 关节角 -> 末端 workspace 系 XY 位置."""
+    x = base[0] + A1 * math.cos(q1) + A2 * math.cos(q1 + q2)
+    y = base[1] + A1 * math.sin(q1) + A2 * math.sin(q1 + q2)
+    return np.array([x, y])
+
+
 class TwoArmServer(Node):
     """双臂仿真桥节点: 订阅指令话题, 驱动 MuJoCo, 周期回传 /joint_state."""
 
@@ -105,6 +112,7 @@ class TwoArmServer(Node):
 
         self.create_subscription(String, 'tool_config', self.on_tool_config, 10)
         self.create_subscription(String, 'touch_command', self.on_touch, 10)
+        self.create_subscription(String, 'move_to', self.on_move_to, 10)
         self.create_subscription(String, 'ball_position', self.on_ball_position, 10)
         self.create_subscription(String, 'reset_command', self.on_reset, 10)
 
@@ -164,6 +172,44 @@ class TwoArmServer(Node):
         self.data.mocap_pos[self.ball_mocap] = [x, y, 0.5]
         self.get_logger().info('小球位置 -> [%.3f, %.3f]' % (x, y))
 
+    def on_move_to(self, msg):
+        # 契约 v1.2: 载荷 "ARM:x,y"(workspace 系, 与 tool_config 同风格).
+        # 校验与 ball_position 同级: 非有限数字拒绝; 超出工作空间钳制; 不可达(|r|>0.8)拒绝; 无末端拒绝.
+        try:
+            head, tail = msg.data.split(':')
+            arm = head.strip()
+            x = float(tail.split(',')[0])
+            y = float(tail.split(',')[1])
+        except Exception:
+            self.get_logger().warn('非法移动指令: %s' % msg.data)
+            return
+        if arm not in ARMS:
+            self.get_logger().warn('非法臂: %s' % arm)
+            return
+        if self.tools[arm] == 'none':
+            self.get_logger().warn('臂 %s 没有配置末端执行器, 无法移动' % arm)
+            return
+        if not (math.isfinite(x) and math.isfinite(y)):
+            self.get_logger().warn('非法移动目标(非有限数字), 拒绝: %s' % msg.data)
+            return
+        LIMIT = 1.5
+        clamped = False
+        if abs(x) > LIMIT:
+            x = math.copysign(LIMIT, x)
+            clamped = True
+        if abs(y) > LIMIT:
+            y = math.copysign(LIMIT, y)
+            clamped = True
+        if clamped:
+            self.get_logger().warn('移动目标超出工作空间, 已钳制到 [%.2f, %.2f]' % (x, y))
+        rel = np.array([x, y]) - ARMS[arm]['base']
+        q = ik_relative(rel[0], rel[1])
+        if q is None:
+            self.get_logger().warn('臂 %s 够不到目标 [%.2f, %.2f]' % (arm, x, y))
+            return
+        self.targets[arm] = np.array(q)
+        self.get_logger().info('臂 %s 移向 [%.3f, %.3f], 关节角 [%.3f, %.3f]' % (arm, x, y, q[0], q[1]))
+
     def on_touch(self, msg):
         arm = msg.data
         if arm not in ARMS:
@@ -181,7 +227,7 @@ class TwoArmServer(Node):
         self.get_logger().info('臂 %s 去触碰小球, 关节角 [%.3f, %.3f]' % (arm, q[0], q[1]))
 
     def publish_joint_state(self):
-        # 回传格式见 bridge/contract.md v1.0: JSON 字符串, 含版本号 v=1.
+        # 回传格式见 bridge/contract.md v1.2: JSON 字符串, 含版本号 v=1 与末端位置 ee(workspace 系).
         state = {
             'v': 1,
             'joints': {
@@ -190,7 +236,17 @@ class TwoArmServer(Node):
             },
             'tools': dict(self.tools),
             'ball': [float(self.ball[0]), float(self.ball[1])],
+            'ee': {
+                'A': [float(self.data.qpos[a]) for a in self.jq['A']],
+                'B': [float(self.data.qpos[a]) for a in self.jq['B']],
+            },
         }
+        # ee 用 FK 正解(workspace 系, 臂基座偏移 + 正解), 覆盖上面的关节角占位.
+        for arm in ARMS:
+            q1 = self.data.qpos[self.jq[arm][0]]
+            q2 = self.data.qpos[self.jq[arm][1]]
+            ee = fk_absolute(q1, q2, ARMS[arm]['base'])
+            state['ee'][arm] = [float(ee[0]), float(ee[1])]
         msg = String()
         msg.data = json.dumps(state)
         self.state_pub.publish(msg)

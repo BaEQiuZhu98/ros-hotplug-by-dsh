@@ -55,6 +55,22 @@ export function apply(ctx, config = {}) {
   这是挂载体系的约定依赖).
 - 副作用全部随插件 dispose 回收(apply 返回 disposer).
 
+### 3.1 能力间协作: waterfall 执行链(契约 v1.2 起)
+
+- **作用域化发射必须经挂载服务助手**: 能力实例是零依赖(禁 import 任何包), 而跨作用域的事件织入需要 dsh-scope 的载体——一律调用 `ctx.capabilityMount.scopedWaterfall(armCtx, 'manipulate_execute', [req], 终端函数)`, 不得直接 `ctx.waterfall`(非作用域发射会跨会话拦截泄漏).
+- **req 契约**:
+  ```js
+  { arm: 'A' | 'B', target: [x, y] | null }   // target 为空 = 盲抓预设位置(执行原语自定)
+  ```
+- **拦截器约定**(写给增强器开发者, 如 sensor 类能力):
+  - 只用**闭包 ctx**(回调的 this 是 dispatch 载体, 不是监听器自身或调用点, 不得依赖);
+  - 只许「原地修改 req 字段 + 调用 next()」; 不改字段也应 next();
+  - 不 next() 且返回非 undefined = **带原因否决**(该值上抛为执行结果);
+  - **fail-open 是视觉类拦截器的默认策略**: 感知数据不可用时放行(目标为空 → 执行原语的盲分支)+ 日志告警, 不否决、不抛错;
+  - 多拦截器顺序 = 注册序(可 `{prepend: true}` 插队); v1 不引入 manifest `order` 字段;
+  - 单一职责: 数据注入方只注入数据不改编排, 编排(优先目标位置否则预设点)永远在执行原语内部.
+- **命中判定在执行原语内**: move_to(收敛完成式)返回 `{ok, ee, ball}`(workspace 系), 距离阈值 0.05m; 「sim 算、能力只判」, 输出文案供测试断言.
+
 ## 4. manifest.json 字段与准入校验
 
 ```json
@@ -62,6 +78,7 @@ export function apply(ctx, config = {}) {
   "grasp": {
     "name": "grasp",
     "version": "1.0.0",
+    "kind": "end-effector",
     "description": "夹爪末端: 夹取策略",
     "tool": "host.js",
     "sha256": "<sha256 of host.js>"
@@ -70,7 +87,8 @@ export function apply(ctx, config = {}) {
 ```
 
 - `sha256` 必须真实计算: `sha256sum host.js`.
-- 挂载前校验: 挂载服务 mount 的第一步 = sha256 与 manifest 比对, 不通过直接拒绝.
+- `kind` ∈ {`end-effector`, `sensor`, `skill`}, **缺省视为 `end-effector`**(既有能力不破坏). 挂载服务按 kind 路由挂载点: end-effector → 臂作用域; sensor → 感知槽(agent 层).
+- 挂载前校验: 挂载服务 mount 的第一步 = sha256 与 manifest 比对, 不通过直接拒绝; 准入顺序 = sha256 → kind 校验(槽位类型匹配, 不匹配拒绝并说明) → 规则表 → 落位.
 
 ## 5. 挂载体系(准入 + 臂作用域)
 

@@ -1,0 +1,10 @@
+{
+  "camera_detect": {
+    "name": "camera_detect",
+    "version": "1.0.0",
+    "kind": "sensor",
+    "description": "视觉检测: 仿真视觉读状态回传 ball 字段, 注入抓取执行链",
+    "tool": "host.js",
+    "sha256": "13e0b9dc31a697dad858faa6feb97e66ee3829910742408492aa36b9a917eb86"
+  }
+}

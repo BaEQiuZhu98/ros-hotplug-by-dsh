@@ -46,6 +46,20 @@ def out_lines(proc):
     return [json.loads(x) for x in proc.stdout.strip().splitlines()]
 
 
+def test_ta12_query_timeout(rosenv43):
+    """T-A-12 | query 超时"""
+    proc = run_bridge([
+        't0 = time.time()',
+        'r = b.query_capabilities(wait=2.0)',
+        'print(json.dumps({"ok": r.get("ok"), "error": r.get("error"), "elapsed": time.time() - t0}, ensure_ascii=False))',
+    ], port=9092)
+    lines = out_lines(proc)
+    r = lines[1]
+    assert r['ok'] is False
+    assert '超时未收到' in r['error']
+    assert r['elapsed'] <= 3.0, '超时返回耗时 %.2fs 超过 3s' % r['elapsed']
+
+
 def test_ta05_connect_idempotent(rosenv42):
     """T-A-05 | connect 幂等"""
     proc = run_bridge([
@@ -178,18 +192,6 @@ def test_ta11_query_structure(rosenv42):
         assert isinstance(caps['ball'], list) and len(caps['ball']) == 2
 
 
-def test_ta12_query_timeout(rosenv43):
-    """T-A-12 | query 超时"""
-    proc = run_bridge([
-        't0 = time.time()',
-        'r = b.query_capabilities(wait=2.0)',
-        'print(json.dumps({"ok": r.get("ok"), "error": r.get("error"), "elapsed": time.time() - t0}, ensure_ascii=False))',
-    ], port=9092)
-    lines = out_lines(proc)
-    r = lines[1]
-    assert r['ok'] is False
-    assert '超时未收到' in r['error']
-    assert r['elapsed'] <= 3.0, '超时返回耗时 %.2fs 超过 3s' % r['elapsed']
 
 
 def spawn_daemon():

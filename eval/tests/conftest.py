@@ -45,9 +45,9 @@ def rosenv43():
 
 @pytest.fixture(scope='session')
 def hostsim():
-    """宿主域 0 的 sim_bridge(无头): daemon/CLI 用例固定连 9090,
-    需要该域有 /joint_state 发布者. 用户 rosbridge(9090)之外另起一个
-    测试支撑 sim_bridge, 测后终止, 不改变用户环境."""
+    """宿主域 0 的 rosbridge(9090)+sim_bridge 支撑环境: daemon/CLI 用例固定连 9090,
+    需要该域有 /joint_state 发布者. 若用户 rosbridge(9090)未在运行, 自起测试实例,
+    测后终止——不改变用户环境状态(用户未运行时自起自清)."""
     import subprocess
     import time as _time
     import sys
@@ -56,10 +56,30 @@ def hostsim():
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     sim = Path(__file__).resolve().parents[2] / 'src' / 'ros2' / 'sim_bridge' / 'sim_bridge' / 'two_arm_server.py'
     log = open(RUN_DIR / 'hostsim.log', 'w')
+    procs = []
+
+    def port_open():
+        import socket
+        try:
+            with socket.create_connection(('127.0.0.1', 9090), timeout=1):
+                return True
+        except OSError:
+            return False
+
+    if not port_open():
+        rb = subprocess.Popen(
+            ['bash', '-c', 'source /opt/ros/humble/setup.bash && source /root/venvs/robo/bin/activate && '
+             'HOME=/root ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9090'],
+            stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        procs.append(rb)
+        deadline = _time.time() + 60
+        while _time.time() < deadline and not port_open():
+            _time.sleep(1.0)
     proc = subprocess.Popen(
         ['bash', '-c', 'source /opt/ros/humble/setup.bash && source /root/venvs/robo/bin/activate && '
-         '/root/venvs/robo/bin/python3 %s' % sim],
+         'HOME=/root /root/venvs/robo/bin/python3 %s' % sim],
         stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    procs.append(proc)
     b = Bridge(host='127.0.0.1', port=9090, timeout=2.0)
     # 就绪轮询放独立子进程: 每次子进程全新(规避 pytest 主进程里 roslibpy 单 reactor
     # 限制), 且 connect 失败自动重试(瞬时可恢复故障不误杀 fixture).
@@ -88,22 +108,25 @@ def hostsim():
     if not ok:
         import os
         import signal
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            proc.kill()
+        for p in procs:
+            try:
+                os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                p.kill()
         raise RuntimeError('hostsim: 宿主 9090 域未出现 /joint_state, 最后检查: %r' % (last,))
     yield proc
     import os
     import signal
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        proc.terminate()
-    try:
-        proc.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+    for p in procs:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            p.terminate()
+    for p in procs:
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            p.kill()
 
 
 def pytest_runtest_makereport(item, call):

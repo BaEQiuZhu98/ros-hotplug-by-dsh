@@ -105,6 +105,66 @@ class Bridge:
             return {'ok': False, 'error': '非法臂 "%s", 只能是 A 或 B' % arm}
         return self._publish('/touch_command', arm)
 
+    def move_to(self, arm, x, y, timeout=3.0):
+        """契约 v1.2 收敛完成式: 发布 /move_to 后订阅回传, 等该臂末端(ee)到达
+        目标附近才返回——「返回即已到位」. 返回 {ok, ee, ball} 或 {ok:false, error}.
+        收敛主判据: ee 距目标 < 0.02 m; 辅助: 相邻两次采样稳定. 超时必须小于
+        挂载服务 bridge 层的 5s 兜底(契约不变量)."""
+        if arm not in VALID_ARMS:
+            return {'ok': False, 'error': '非法臂 "%s", 只能是 A 或 B' % arm}
+        try:
+            fx, fy = float(x), float(y)
+        except (TypeError, ValueError):
+            return {'ok': False, 'error': '移动目标必须是数字, 收到 %r, %r' % (x, y)}
+        if not (math.isfinite(fx) and math.isfinite(fy)):
+            return {'ok': False, 'error': '移动目标必须是有限数字, 收到 %r, %r' % (x, y)}
+        if self.client is None or not self.client.is_connected:
+            return {'ok': False, 'error': '未连接 rosbridge, 请先 connect()'}
+        published = self._publish('/move_to', '%s:%s,%s' % (arm, fx, fy))
+        if not published.get('ok'):
+            return published
+        target = (fx, fy)
+        deadline = time.time() + timeout
+        result = {}
+        result_ready = threading.Event()
+
+        def on_message(message):
+            try:
+                caps = json.loads(message.get('data', '{}'))
+            except Exception:
+                return
+            ee = caps.get('ee', {}).get(arm)
+            ball = caps.get('ball')
+            if ball is not None:
+                result['ball'] = ball
+            if not (isinstance(ee, list) and len(ee) == 2):
+                return
+            dist = math.hypot(ee[0] - target[0], ee[1] - target[1])
+            last = result.get('last_ee')
+            if last is not None and abs(last[0] - ee[0]) < 0.02 and abs(last[1] - ee[1]) < 0.02:
+                result['stable'] = result.get('stable', 0) + 1
+            else:
+                result['stable'] = 0
+            result['last_ee'] = list(ee)
+            if dist < 0.02 and result.get('stable', 0) >= 1:
+                result['ok'] = True
+                result['ee'] = list(ee)
+                result_ready.set()
+
+        topic = roslibpy.Topic(self.client, '/joint_state', 'std_msgs/String')
+        try:
+            topic.subscribe(on_message)
+            if not result_ready.wait(timeout):
+                return {'ok': False, 'error': 'move_to 收敛超时(%.1fs): 末端未到达目标' % timeout}
+            return {'ok': True, 'ee': result['ee'], 'ball': result['ball']}
+        except Exception as e:
+            return {'ok': False, 'error': 'move_to 订阅回传失败: %s' % e}
+        finally:
+            try:
+                topic.unsubscribe()
+            except Exception:
+                pass
+
     def reset(self):
         """全部复位(契约 v1.1): 关节归零 + 末端全部卸下 + 小球回初始位置."""
         return self._publish('/reset_command', 'reset')
@@ -177,6 +237,8 @@ def daemon_main():
             result = bridge.set_ball(args[0], args[1])
         elif method == 'touch' and len(args) >= 1:
             result = bridge.touch(args[0])
+        elif method == 'move_to' and len(args) >= 3:
+            result = bridge.move_to(args[0], args[1], args[2])
         elif method == 'reset':
             result = bridge.reset()
         elif method == 'query_capabilities':
@@ -214,6 +276,8 @@ if __name__ == '__main__':
             result = bridge.set_ball(_sys.argv[2], _sys.argv[3])
         elif method == 'touch' and len(_sys.argv) >= 3:
             result = bridge.touch(_sys.argv[2])
+        elif method == 'move_to' and len(_sys.argv) >= 5:
+            result = bridge.move_to(_sys.argv[2], _sys.argv[3], _sys.argv[4])
         elif method == 'reset':
             result = bridge.reset()
         elif method == 'query_capabilities':

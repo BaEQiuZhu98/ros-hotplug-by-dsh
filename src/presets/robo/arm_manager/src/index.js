@@ -2,19 +2,20 @@
 //
 // 职责:
 //   1. 按挂载服务的全局臂清单(默认 A/B)为**每个会话**预建臂作用域(createScope,
-//      parent 绑到 preset 作用域, 与 agent 作用域为兄弟分支 —— 臂实例不上浮);
-//   2. 把臂上下文注册到能力挂载服务(registerArms), 挂载服务按臂名在对应上下文上
-//      ctx.plugin / fiber.dispose 末端实例(同名 manipulate 靠臂作用域隔离);
+//      parent 绑到该会话 agent 作用域 —— 臂实例不上浮(父不视子), 臂事件沿链冒泡经 agent 层);
+//   1.5 预建感知槽(标签复用 agent key 本身): sensor 类能力挂载点, detect_ball 对 agent 可见;
+//   2. 把臂上下文与感知槽注册到能力挂载服务(registerArms/registerSlot), 挂载服务按 kind
+//      路由在对应上下文上 ctx.plugin / fiber.dispose 能力实例(同名 manipulate 靠臂作用域隔离);
 //   3. 提供 agent 的两个工具:
 //      arm_status(arm)  感知: 该臂是否具备可用末端(只回答 ready, 不泄露末端型号);
 //      take_object(arm) 执行: 让该臂去拿东西(夹取/吸附策略在实例内部).
 //
 // 臂上下文随会话生灭(事件驱动, T-S-11): 本插件实例在 preset 的 standing 组合层
-// (各会话共享), 但每条臂的作用域与注册按 agent/created + agent/disposed 事件
+// (各会话共享), 但每条臂的作用域与感知槽按 agent/created + agent/disposed 事件
 // 逐会话建立与注销; 工具执行经 exec.agent 解析调用者会话的臂作用域.
 // 本包以 npm 包形态装入 profile 的 node_modules(依赖回退解析), preset 行用绝对路径引用;
-// 它 import @deepseek-ai/dsh-scope 获取 createScope/scopeOf(经 profiles/node_modules 回退).
-import { createScope, scopeOf } from '@deepseek-ai/dsh-scope'
+// 它 import @deepseek-ai/dsh-scope 获取 createScope(经 profiles/node_modules 回退).
+import { createScope, scopeOf, scopeTarget } from '@deepseek-ai/dsh-scope'
 
 export const name = 'robo-arm-manager'
 export const inject = ['capabilityMount', 'tools']
@@ -23,26 +24,39 @@ export function apply(ctx) {
 
   // 臂清单唯一来源 = 挂载服务的全局臂清单 config.arms(审查 v3: 去 A/B 硬编码).
   // 臂管理器只做消费: 按清单预建作用域、注册工具 enum、上报臂上下文.
+  // 作用域化事件织入助手(P1): 本包可解析 dsh-scope, 把实现注入挂载服务——能力实例
+  // 经 capabilityMount.scopedWaterfall 零依赖发射, 事件只沿臂作用域祖先链路由.
+  if (typeof ctx.capabilityMount.attachScopedWaterfall === 'function') {
+    ctx.capabilityMount.attachScopedWaterfall((armCtx, name, args, next) =>
+      ctx.waterfall(scopeTarget(ctx, scopeOf(armCtx)), name, ...args, next),
+    )
+  } else {
+    console.warn('[robo-arm-manager] 挂载服务缺少 attachScopedWaterfall, 执行链织入不可用')
+  }
   const armList = Array.isArray(ctx.capabilityMount.list().arms) ? ctx.capabilityMount.list().arms : []
   if (armList.length === 0) {
     console.error('[robo-arm-manager] 挂载服务臂清单为空, 跳过臂作用域与工具注册')
     return () => {}
   }
 
-  // agent -> { keys, scopes, unregister }  每个会话一套臂作用域与挂载服务注册.
+  // agent -> { keys, scopes, unregister, slotScope, slotUnregister }  每个会话一套臂作用域 + 感知槽.
   const sessionArms = new Map()
 
   function setupSession(agent) {
     if (agent === undefined || agent === null || sessionArms.has(agent)) return
-    // 每条臂一个作用域: 键对象即 scope 身份; parent 绑到 preset 作用域
-    // (与 agent 作用域为兄弟分支, 臂内实例对 agent 不可见 —— 分层可见性).
+    // 感知槽(场景扩展): 标签复用 agent key 本身(createScope 不带 parent, agent key 已由工厂绑定)——
+    // sensor 实例落在 agent 层: detect_ball 对 agent 可见, 拦截器沿父链命中臂事件.
+    const slotScope = createScope(ctx, agent)
+    const slotUnregister = ctx.capabilityMount.registerSlot('perception', slotScope.ctx)
+    // 每条臂一个作用域: 键对象即 scope 身份; parent 绑到会话 agent 作用域
+    // (臂事件沿链冒泡经 agent 层, 感知槽拦截器可命中; 臂内实例仍不上浮 —— 父不视子).
     const keys = Object.fromEntries(armList.map((arm) => [arm, {}]))
     const scopes = armList.map((arm) =>
-      createScope(ctx, keys[arm], { parent: scopeOf(ctx) }),
+      createScope(ctx, keys[arm], { parent: agent }),
     )
     const armsBySession = Object.fromEntries(armList.map((arm, i) => [arm, scopes[i].ctx]))
     const unregister = ctx.capabilityMount.registerArms(armsBySession)
-    sessionArms.set(agent, { keys, scopes, unregister })
+    sessionArms.set(agent, { keys, scopes, unregister, slotScope, slotUnregister })
     console.log('[robo-arm-manager] 臂作用域已就绪: %s', armList.join(', '))
   }
 
@@ -51,9 +65,11 @@ export function apply(ctx) {
     if (entry === undefined) return
     sessionArms.delete(agent)
     try { entry.unregister() } catch (e) { console.warn('[robo-arm-manager] 注销臂上下文失败: %s', e && e.message) }
+    try { entry.slotUnregister() } catch (e) { console.warn('[robo-arm-manager] 注销感知槽失败: %s', e && e.message) }
     for (const scope of entry.scopes) {
       try { scope.dispose() } catch (e) { console.warn('[robo-arm-manager] 销毁臂作用域失败: %s', e && e.message) }
     }
+    try { entry.slotScope.dispose() } catch (e) { console.warn('[robo-arm-manager] 销毁感知槽失败: %s', e && e.message) }
   }
 
   // 会话生灭事件: standing 层监听器沿作用域链收到其下所有 agent 的事件.
