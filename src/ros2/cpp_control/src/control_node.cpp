@@ -28,6 +28,8 @@ private:
     auto t0 = std::chrono::steady_clock::now();
 
     // ---- 假装的控制计算: PID 跟踪目标 1.0(和 demo/11 Python 版完全相同) ----
+    // 教学取舍: 积分项用目标周期 target_period_ 而非实测间隔(实测间隔见下方抖动统计);
+    // 对恒定目标频率演示足够, 更严格的实现应按每次 tick 的真实 dt 积分.
     double err = 1.0 - q_;
     integral_ += err * target_period_;
     q_ += (20.0 * err + 40.0 * integral_) * target_period_;

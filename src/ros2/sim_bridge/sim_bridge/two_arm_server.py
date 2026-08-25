@@ -138,7 +138,8 @@ class TwoArmServer(Node):
         self.get_logger().info('臂 %s 末端执行器 = %s' % (arm, tool))
 
     def on_ball_position(self, msg):
-        # 载荷格式 "x,y"(XY 平面, z 固定 0.5).
+        # 载荷格式 "x,y"(XY 平面, z 固定 0.5). 服务端校验(防御深度): 非有限数字直接拒绝,
+        # 超出工作空间的范围做钳制并告警, 避免污染 mocap 导致仿真发散.
         try:
             parts = msg.data.split(',')
             x = float(parts[0])
@@ -146,6 +147,19 @@ class TwoArmServer(Node):
         except Exception:
             self.get_logger().warn('非法小球位置: %s' % msg.data)
             return
+        if not (math.isfinite(x) and math.isfinite(y)):
+            self.get_logger().warn('非法小球位置(非有限数字), 拒绝: %s' % msg.data)
+            return
+        LIMIT = 1.5  # 工作空间半宽(m), 超出按边界钳制.
+        clamped = False
+        if abs(x) > LIMIT:
+            x = math.copysign(LIMIT, x)
+            clamped = True
+        if abs(y) > LIMIT:
+            y = math.copysign(LIMIT, y)
+            clamped = True
+        if clamped:
+            self.get_logger().warn('小球位置超出工作空间, 已钳制到 [%.2f, %.2f]' % (x, y))
         self.ball = np.array([x, y])
         self.data.mocap_pos[self.ball_mocap] = [x, y, 0.5]
         self.get_logger().info('小球位置 -> [%.3f, %.3f]' % (x, y))
