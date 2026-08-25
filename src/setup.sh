@@ -86,6 +86,10 @@ rm -rf "$PANEL_PKG_DIR/node_modules"
 if grep -q 'id: cap-mount-panel' "$PATCH_FILE" 2>/dev/null; then
   echo "面板行已存在于 $PATCH_FILE, 跳过写入."
 else
+  # patch 文件可能以无换行结尾(loader 写回后常见): 先补换行, 否则新块会拼到上一行.
+  if [ -f "$PATCH_FILE" ] && [ -s "$PATCH_FILE" ] && [ -n "$(tail -c 1 "$PATCH_FILE" | tr -d '\n')" ]; then
+    printf '\n' >> "$PATCH_FILE"
+  fi
   cat >> "$PATCH_FILE" <<EOF
 - insert:
   - id: cap-mount-panel
