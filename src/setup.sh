@@ -49,7 +49,8 @@ EOF
 fi
 
 # 1. 挂载服务行(幂等): 已存在则跳过, 否则追加到 profile 的 patch 层.
-if grep -q 'id: capability-mount-service' "$PATCH_FILE" 2>/dev/null; then
+# loader 可能把用户 patch 写回为 "[]"(空列表): 视为无挂载服务行, 重新写入.
+if [ -f "$PATCH_FILE" ] && grep -q 'id: capability-mount-service' "$PATCH_FILE" && ! grep -q '^\[\]$' "$PATCH_FILE"; then
   echo "挂载服务行已存在于 $PATCH_FILE, 跳过写入(如需改路径请手工更新该行 config)."
 else
   if [ -f "$PATCH_FILE" ]; then
