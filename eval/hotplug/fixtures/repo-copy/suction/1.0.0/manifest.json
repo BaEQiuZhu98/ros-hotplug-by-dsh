@@ -1,9 +1,0 @@
-{
-  "suction": {
-    "name": "suction",
-    "version": "1.0.0",
-    "description": "吸盘能力: 把指定臂末端切到吸盘并触碰小球",
-    "tool": "host.js",
-    "sha256": "7b8bc8d6f33f23c47f1b83fd86c4ba255bc36f89fe31e18f2aa7d5c75c5749b3"
-  }
-}

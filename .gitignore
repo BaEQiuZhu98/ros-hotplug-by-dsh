@@ -36,3 +36,10 @@ HANDOFF.md
 
 # pnpm
 .pnpm-store/
+
+# eval 运行产物(日志与侦察中间文件不入库)
+eval/results/logs/
+eval/results/recon-agent.json
+
+# eval 运行时产物(装配脚本重建, 不入库)
+eval/hotplug/fixtures/repo-copy/
