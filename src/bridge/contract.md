@@ -1,4 +1,4 @@
-# bridge/contract.md — 桥接消息契约 v1.0
+# bridge/contract.md — 桥接消息契约 v1.1
 
 > 本文档是项目 L4「桥接契约 + SDK」的消息契约部分, 是**本项目唯一自造 API** 的规范.
 > 两端(DSH 能力层经 rosbridge ↔ ROS2 控制层)都按本文档实现, 独立演进.

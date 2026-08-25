@@ -43,7 +43,12 @@ class Bridge:
         if self.client is not None and self.client.is_connected:
             return {'ok': True}
         self.client = roslibpy.Ros(host=self.host, port=self.port)
-        self.client.run()
+        try:
+            self.client.run()
+        except Exception as e:
+            # 契约 §5: 任何失败都以 {ok:false, error} 返回, 不抛 traceback.
+            self.client = None
+            return {'ok': False, 'error': '无法连接 rosbridge (ws://%s:%d): %s' % (self.host, self.port, e)}
         deadline = time.time() + self.timeout
         while time.time() < deadline:
             if self.client.is_connected:
@@ -137,6 +142,44 @@ class Bridge:
                 pass
 
 
+def daemon_main():
+    """常驻模式(P2-10): stdin 逐行读 JSON 命令, 复用同一条 rosbridge 连接, stdout 逐行回 JSON.
+    命令: {"method": "set_tool|set_ball|touch|reset|query_capabilities", "args": [...]}
+    首行输出 {"ok": true, "daemon": "ready"} 表示就绪; 之后每请求一行响应."""
+    import sys
+    bridge = Bridge()
+    ok = bridge.connect()
+    if not ok['ok']:
+        print(json.dumps(ok, ensure_ascii=False), flush=True)
+        sys.exit(1)
+    print(json.dumps({'ok': True, 'daemon': 'ready'}, ensure_ascii=False), flush=True)
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            req = json.loads(line)
+        except Exception as e:
+            print(json.dumps({'ok': False, 'error': '请求不是 JSON: ' + str(e)}, ensure_ascii=False), flush=True)
+            continue
+        method = req.get('method')
+        args = req.get('args', [])
+        if method == 'set_tool' and len(args) >= 2:
+            result = bridge.set_tool(args[0], args[1])
+        elif method == 'set_ball' and len(args) >= 2:
+            result = bridge.set_ball(args[0], args[1])
+        elif method == 'touch' and len(args) >= 1:
+            result = bridge.touch(args[0])
+        elif method == 'reset':
+            result = bridge.reset()
+        elif method == 'query_capabilities':
+            result = bridge.query_capabilities()
+        else:
+            result = {'ok': False, 'error': '未知方法或参数不足: %r' % (req,)}
+        print(json.dumps(result, ensure_ascii=False), flush=True)
+    bridge.close()
+
+
 if __name__ == '__main__':
     # CLI 入口(给能力包 host.js 等外部调用方用): 一行命令 = 一次连接 + 一次调用,
     # 结果以 JSON 打印(机器可读), 退出码 0 = ok, 1 = 失败.
@@ -144,9 +187,12 @@ if __name__ == '__main__':
     import sys as _sys
 
     if len(_sys.argv) < 2:
-        print('用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|reset|query_capabilities>')
+        print('用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|reset|query_capabilities|daemon>')
         _sys.exit(1)
     method = _sys.argv[1]
+    if method == 'daemon':
+        daemon_main()
+        _sys.exit(0)
     bridge = Bridge()
     ok = bridge.connect()
     if not ok['ok']:
