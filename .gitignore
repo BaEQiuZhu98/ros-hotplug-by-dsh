@@ -33,3 +33,6 @@ results/
 
 # other
 HANDOFF.md
+
+# pnpm
+.pnpm-store/

@@ -1,7 +1,8 @@
 // cap-mount-panel client 半部 - 末端能力面板(架构 v2).
 //
-// 落盘形态: 本文件内容直接作为动态插件的 code.client(cordis_define), 重启 dsh web 后
-// 由 agent 读本文件重新激活. 将来持久化走组合挂载 + tsdown client.
+// 落盘形态: 本文件是动态插件演示形态的 code.client(cordis_define), 重启 dsh web 后丢失,
+// 由 agent 读本文件重新激活. 持久化形态见 src/packages/cap-mount-panel(树外包双面包,
+// 同语义, host.call 通道换成同源 fetch /cap-mount), 由 setup.sh 安装, 重启常驻.
 //
 // UI: 输入区上方两行(臂 A/B), 每行 grasp1.0.0/grasp1.1.0/suction1.0.0 三键 toggle
 //     (点选生效/再点取消, 当前挂载高亮) + 「去拿小球」(把消息发给 agent, 由 agent 判断).

@@ -1,0 +1,24 @@
+{
+  "name": "@ros-hotplug/dsh-plugin-cap-mount-panel",
+  "version": "1.0.0",
+  "description": "End-effector mount panel: persistent tree package (host half registers /cap-mount RPC, client half renders the conversation.input.dock strip)",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.2"
+  },
+  "license": "MIT"
+}

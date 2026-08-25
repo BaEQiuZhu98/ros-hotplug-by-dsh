@@ -75,17 +75,35 @@ EOF
   echo "挂载服务行已写入 $PATCH_FILE"
 fi
 
+# 1.5. 面板树外包包(架构 v2 写入口, P2-12 持久化): 复制进 profile node_modules
+#     并写入 patch 行. host 半部零构建; client 半部(lib/client.js)是仓库内已构建产物,
+#     改面板源码后先在本包目录 pnpm run bundle 再跑本脚本.
+PANEL_PKG_NAME='@ros-hotplug/dsh-plugin-cap-mount-panel'
+PANEL_PKG_DIR="$PROFILE_DIR/node_modules/$PANEL_PKG_NAME"
+mkdir -p "$PANEL_PKG_DIR"
+cp -r "$REPO/src/packages/cap-mount-panel/." "$PANEL_PKG_DIR/"
+rm -rf "$PANEL_PKG_DIR/node_modules"
+if grep -q 'id: cap-mount-panel' "$PATCH_FILE" 2>/dev/null; then
+  echo "面板行已存在于 $PATCH_FILE, 跳过写入."
+else
+  cat >> "$PATCH_FILE" <<EOF
+- insert:
+  - id: cap-mount-panel
+    name: '$PANEL_PKG_NAME'
+    inject: [capabilityMount]
+EOF
+  echo "面板行已写入 $PATCH_FILE"
+fi
+
 # 2. robo preset + 臂管理器包.
 bash "$REPO/src/presets/robo/install.sh" "$DSH_HOME" "$PROFILE"
 
 # 3. 后续指引.
 echo ""
 echo "===== 安装完成, 后续步骤 ====="
-echo "1. 重启 dsh web(挂载服务在启动时加载): Ctrl-C 后重新运行 dsh web"
-echo "2. 新建会话选 preset「机器人任务」(robo 会话注册臂上下文)"
-echo "3. 面板激活(动态插件, 每次重启 web 后都要做): 在「创造模式」会话里对 agent 说:"
-echo "   读取 $REPO/src/capabilities/mount_service/panel.host.js 与同目录 panel.client.js,"
-echo "   分别作为 code.host 与 code.client, 用 cordis_define 定义并 cordis_run 激活, 然后刷新页面."
+echo "1. 重启 dsh web(挂载服务与面板在启动时加载): Ctrl-C 后重新运行 dsh web"
+echo "2. 刷新页面: 面板(末端能力)常驻输入区上方, 无需再动态激活"
+echo "3. 新建会话选 preset「机器人任务」(robo 会话注册臂上下文)"
 echo "4. 机器人侧(另开终端):"
 echo "   ros2 launch rosbridge_server rosbridge_websocket_launch.xml"
 echo "   source /opt/ros/humble/setup.bash && source $(dirname "$PYTHON")/activate && python3 $REPO/src/ros2/sim_bridge/sim_bridge/two_arm_server.py --view"

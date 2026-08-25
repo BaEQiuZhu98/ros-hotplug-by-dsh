@@ -1,7 +1,8 @@
 // cap-mount-panel host 半部 - 末端能力面板(架构 v2, 臂隔离 API).
 //
-// 落盘形态: 本文件内容直接作为动态插件的 code.host(cordis_define), 重启 dsh web 后
-// 由 agent 读本文件重新激活(动态插件不继承). 将来持久化走组合挂载 + tsdown client.
+// 落盘形态: 本文件是动态插件演示形态的 code.host(cordis_define), 重启 dsh web 后丢失,
+// 由 agent 读本文件重新激活. 持久化形态见 src/packages/cap-mount-panel(树外包双面包,
+// 同语义, harness 通道换成 webServer /cap-mount 路由), 由 setup.sh 安装, 重启常驻.
 //
 // 面板职责(与用户确认): 只装/卸末端 + 发指令; 拿小球交给 agent 判断执行.
 //   - 点工具按钮 = 该臂挂载能力 + set_tool 物理生效; 再点 = 卸载 + 末端复位.
