@@ -283,6 +283,8 @@ ros-hotplug-by-dsh/
 │   │   ├── mount_service/         #    capability mount service (host-resident: admission + arm bookkeeping; web panel included)
 │   │   ├── repo/                  #    capability repo directory (first-class deliverable): grasp/1.0.0/{host.js, manifest.json} ...
 │   │   └── pack.sh                #    optional distribution shell: repo dir → npm tarball
+│   ├── packages/                   #    out-of-tree npm packages (installed into profile node_modules)
+│   │   └── cap-mount-panel/        #    end-effector panel (dual-face: host /cap-mount route + client tsdown bundle)
 │   ├── presets/                   #    runtime carrier
 │   │   └── robo/                  #    agent.cordis.yml (persona + observer + arm manager + arm_status/take_object + skills)
 │   ├── ros2/                      #    robot side (colcon packages)

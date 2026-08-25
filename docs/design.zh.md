@@ -300,6 +300,8 @@ ros-hotplug-by-dsh/
 │   │   ├── mount_service/         #   能力挂载服务(host 常驻: 准入检查 + 臂管理; 含 web 面板)
 │   │   ├── repo/                  #   能力仓库目录(一等交付件): grasp/1.0.0/{host.js, manifest.json} ...
 │   │   └── pack.sh                #   可选发布外壳: 仓库目录打包成 npm tarball(公开分发用)
+│   ├── packages/                   #   树外包 npm 包(安装形态: profile node_modules)
+│   │   └── cap-mount-panel/        #   末端能力面板(双面: host /cap-mount 路由 + client tsdown bundle)
 │   ├── presets/                   #   运行载体
 │   │   └── robo/                  #   agent.cordis.yml(persona + observer + 臂管理器 + arm_status/take_object + skills)
 │   ├── ros2/                      #   机器人侧(colcon 包)
