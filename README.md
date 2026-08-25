@@ -70,17 +70,25 @@ Mapping reliability engineering practice onto the hot-plug demo (`demo/13-hotplu
 
 | Engineering practice | This project's counterpart |
 |---|---|
-| Zero-trust pipeline (cloud sign/encrypt - device verify/decrypt) | Verify manifest / hash before mounting a capability; reject invalid ones |
-| Active/standby redundancy + multi-version coexistence | One capability supports multiple coexisting versions |
+| Integrity hash verification (signature extension TBD) | Verify manifest / hash before mounting a capability; reject invalid ones |
+| Multi-version coexistence | One capability supports multiple coexisting versions |
 | Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware (grayscale not in demo scope) |
-| Second-level auto rollback | Auto-rollback to the previous version if activation fails |
+| Auto rollback on failure (with a brief swap window) | Auto-restore the old instance if a swap fails (best effort, explicit alert on restore failure) |
 | Pub/sub event notification | Capability add/remove broadcasts events; agent perceives via subscription |
 | Hardware-difference shielding layer (decoupling) | Capability abstraction: same-type end-effectors shadow by name; upper layers unaware |
-| 99.9% availability / no leaks | `isolate` realm isolation + Cordis dispose for exact cleanup |
+| Exact resource reclamation (mechanism verifiable, not an SLA metric) | arm-scope isolation + Cordis dispose for exact cleanup |
 
 See [`docs/design.md`](docs/design.md) section 8.
 
 ---
+
+## Roadmap (future work, recorded here)
+
+- **Restart reconciliation**: after a DSH-side restart, rebuild mount records from sim_bridge physical state (today "reset all" or re-creating the session works around it).
+- **Simulation realism**: future sim uses physically real suction/gripper + ball (contact detection, the ball follows the end-effector once grasped), to give "success rate" physical meaning.
+- **Evaluation suite eval/**: hotplug five-criteria automation / robot public-baseline comparison / agent vs oracle vs random.
+- **Panel persistence**: tsdown build for the client half, restored automatically on restart.
+- **native_swap measurement**: timing comparison of native ROS2 end-effector swap (measured, never prefilled).
 
 ## Quick start
 

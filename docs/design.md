@@ -68,11 +68,13 @@ Existing solutions manage either "process/node" (ROS2 lifecycle/composable), "co
 
 ## 7. System design
 
+> The mechanisms in this section are verified on DSH 0.1.0-rc.7 (the installed package.json version); re-check interfaces against the runtime after upgrades.
+
 ### 7.1 Scope hierarchy
 
 ```
 layer 0  global (machine)        host-composition mounts, inherited by every agent
-   ├─ sim_bridge (ROS2 process)     physical truth: arms/joints/end-effectors/ball state
+   ├─ sim_bridge (ROS2 process)     visualization echo (kinematic truth): arms/joints/end-effectors/ball state (physical realism on the roadmap)
    ├─ capability mount service      admission checks + arm bookkeeping + instance registry; registers no agent tools
    ├─ web panel (host + client)     the only write path (mount/unmount end-effectors)
    └─ tools registry (host service) the layer container for tool registrations
@@ -136,7 +138,7 @@ The table only says allow/reject and never holds instances. Order: sha256 → ru
 ### 7.6 Multi-agent
 
 - **Task agent** (main): perception + decision + `take_object` calls.
-- **Observation agent**: subscribes to `tools/change` and state feedback, reports "current capability set / hot-plug log" (reliability point "event notification").
+- **Observation agent**: subscribes to `tools/change` and state feedback, reports "current capability set / hot-plug log" (reliability point "event notification"). Two-channel perception: `tools/change` is the **push channel** (events broadcast on add/remove; the observation report currently appears as host process logs), `arm_status` is the **query fallback** (pull per arm at any time); the agent's decisions rely on `arm_status`.
 - **Evaluation subagents**: delegated to run `eval/`.
 
 ### 7.7 Initial state
@@ -192,7 +194,7 @@ Precondition: arm A has grasp (grasp strategy), arm B has suction (suction strat
 | Unmount end-effector | arm-layer `fiber.dispose()` (async, exact cleanup) | precisely reclaims its subscriptions/connections; the other arm is unaffected |
 | Replace end-effector | unmount old instance + mount new (repo version dirs coexist) | agent-unaware; the same take_object automatically switches strategy |
 | Same-name isolation | arm scopes: same-name manipulate instances coexist, each with its own lifecycle | two end-effector instances never cross-talk |
-| Failure rollback | a failed new instance keeps the old handle, the old instance stays | the old end-effector keeps working |
+| Failure rollback | swap unmounts the old instance first (a brief window), then auto-restores it on failure (best effort, explicit alert if restore fails) | injected bad version → old end-effector restored and usable |
 | Change perception | event broadcast (tools/change) + agent subscription | the agent automatically perceives add/remove |
 
 ### 7.11 Write/read path separation (the human is the only writer)
@@ -228,7 +230,7 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 | Zero-trust pipeline | verify manifest/hash before mounting an end-effector; reject invalid | tampered manifest → rejected |
 | Active/standby + multi-version | one end-effector capability, multiple coexisting versions (repo version dirs) | same-arm version swap, per-arm different versions, no conflict |
 | Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware | task unaffected during the switch |
-| Second-level auto rollback | a failed new instance keeps the old handle, the old instance stays | inject fault → old end-effector keeps working |
+| Auto rollback on failure | a failed swap auto-restores the old instance (best effort, explicit alert on restore failure) | inject fault → old end-effector restored |
 | Pub/sub event notification | end-effector add/remove broadcasts events; agent subscribes | event received on mount/unmount |
 | Hardware-difference shielding | the agent only perceives `ready`; grasp/suction strategies stay inside instances | same API auto-switches strategy after an end-effector swap |
 | High availability / no leaks | arm-scope isolation + dispose for exact cleanup | no residue after unmount |
@@ -240,8 +242,8 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 | 1 | zero-trust/hash | mount guard (inside the mount service) + arm-scope registration | tampered hash → rejected |
 | 2 | multi-version | repo version directories coexist | arms can mount different versions, no overwrite |
 | 3 | version swap | unmount old instance + mount new instance | API unchanged during the switch, agent-unaware |
-| 4 | failure rollback | a failed new instance keeps the old handle | bad version fails to mount → old end-effector keeps working |
-| 5 | event | `tools/change` broadcast + subscription | listener receives the event |
+| 4 | failure rollback | swap unmounts the old instance first (a brief window), then auto-restores it on failure (best effort) | bad version fails to mount → old end-effector restored |
+| 5 | event | `tools/change` broadcast as the push channel (observation logs), `arm_status` as the query fallback | listener receives the event |
 | 6 | same-name isolation | arm scopes: same-name manipulate instances coexist | two arms with the same end-effector never cross-talk |
 | 7 | no leaks | arm scope + Cordis dispose | no residual subscription/state after unmount |
 
@@ -411,6 +413,10 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
 ## 12. Limitations & future
 
 - Only the software capability layer; hardware (electrical/connection), hard real-time, safety boundaries out of scope.
+- **Link latency (stated as measured)**: perception-execution goes through rosbridge; after the SDK is made resident,
+  one SDK call costs about 100 ms (measured locally: query_capabilities avg 100 ms, dominated by the 10 Hz
+  state-feedback interval; publish-only calls avg 101 ms, dominated by the send flush) — monitoring/task-grade
+  latency, not real-time control; real-time stays in the cpp_control 1 kHz layer.
 - Future: real hardware (`ros2_control hardware_interface`), cross-process/machine hot-plugging, integration with data loop / world models (demo 14/15).
 
 ## 13. Disclosure & timestamps

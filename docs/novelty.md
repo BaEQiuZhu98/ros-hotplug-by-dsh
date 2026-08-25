@@ -65,7 +65,7 @@
 
 ### 3.3 Version timeline: repo versions + mount handles (swap + rollback)
 
-- The capability repo stores immutable code under version directories; the mount system holds per-arm handles: swap = unmount old + mount new (a failed new instance keeps the old handle = rollback).
+- The capability repo stores immutable code under version directories; the mount system holds per-arm handles: swap = unmount old + mount new (a failed swap auto-restores the old instance, best effort = rollback).
 - **Advantage**: multi-version coexistence + version swap + rollback are built-in, not hand-written. (Grayscale traffic-splitting is not part of the demo scope.)
 
 ### 3.4 Anchor contract: visibility = lifecycle (the core difference)

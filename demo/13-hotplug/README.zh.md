@@ -89,3 +89,10 @@ python3 two_arm_server.py --view   # 弹 MuJoCo 窗口: 两臂 + 黄色小球
 ## 附：重启后重新加载
 
 能力工具和 web 面板都是动态插件（进程内临时），重启 `dsh web` 后消失；按上面「cordis 会话」步骤重新 `cordis_define` + `cordis_run` 即可（源码已随本目录保存）。
+
+## 环境约定(路径硬编码说明)
+
+本 demo 为教学演示, 代码内路径(/root/my-project/ros-hotplug-by-dsh、/root/venvs/robo/bin/python3)
+按本机环境写死; 换机器时按 demo/06 的环境搭建步骤重建同名路径即可, 或手动替换.
+生产实现的路径集中化见 `src/setup.sh`(挂载服务 env 唯一路径来源).
+
