@@ -4,17 +4,6 @@
 
 ---
 
-## Author background
-
-| Dimension | Status |
-|---|---|
-| **Strengths** | C / Python / Linux systems programming; distributed systems; real-time forwarding & protocol-stack optimization; high-availability & security-sensitive systems (active/standby redundancy, grayscale upgrade, second-level auto rollback, 99.9% availability, zero-trust pipeline, pub/sub decoupling); AI-assisted engineering; delivery ownership |
-| **Robotics & LLM knowledge** | learned from zero along the demo path (starting at demo/00), covering ROS2 / kinematics / simulation / DSH agent development |
-
-> **Positioning**: use the "systems engineering + reliability" strengths to enter the intersection of *embodied robot software × DSH agent*. **Every piece of robotics and LLM knowledge is learned from zero, in demo order** — this project makes no assumption that you already know anything.
-
----
-
 ## Novelty claim (one sentence)
 
 > **The first to apply DSH spatiotemporal compositionality (layered scopes + Cordis lifecycle) to hot-plugging of embodied-robot capabilities, with a reproducible implementation and evaluation.**
@@ -32,18 +21,38 @@ See [`docs/design.md`](docs/design.md) for the precise boundary.
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # this file (zh / en)
-├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log
+├── LICENSE / .gitignore
 ├── src/                            # source engineering (see src/README.zh.md)
-│   ├── capabilities/               #   capability repo (repo/) + mount service (mount_service/) + spec + mount guard
-│   ├── presets/robo/               #   robot task agent preset (persona + observer + arm manager + arm_status/take_object)
-│   ├── ros2/                       #   sim_bridge (two-arm sim bridge) + cpp_control (1kHz control)
-│   ├── bridge/                     #   bridge contract + thin SDK
-│   └── sim/                        #   MuJoCo models & scenes
-├── eval/                           # evaluation (robot / agent / hotplug / tests)
-├── plugins/                        # archived dynamic Cordis plugins
-└── demo/                           # tutorial dirs (see demo/README.md)
-    ├── 00-dsh-quickstart/ ... 13-hotplug/
-    └── 13-hotplug/                 # ★ flagship demo: capability hot-plugging (with reliability design)
+│   ├── setup.sh                    #    one-shot install (path centralization: mount row / panel pkg / robo preset)
+│   ├── capabilities/               #    ★ capability repo + mount service + spec
+│   │   ├── capability-spec.md      #      capability dev spec (template + manifest + mount flow)
+│   │   ├── mount_service/          #      capability mount service (host-resident: sha256 admission + kind routing + arm/slot context bookkeeping + resident bridge daemon)
+│   │   ├── repo/                   #      capability repo directory (first-class deliverable): grasp/1.0.0|1.1.0|1.2.0, suction/1.0.0, camera_detect/1.0.0
+│   │   └── pack.sh                 #      optional distribution shell: repo dir → npm tarball
+│   ├── packages/                   #    out-of-tree npm packages (installed into profile node_modules)
+│   │   └── cap-mount-panel/        #      capability panel (dual-face: host /cap-mount route + client tsdown bundle)
+│   ├── presets/                    #    runtime carrier
+│   │   └── robo/                   #      robot task agent preset (composition + persona + skills)
+│   │       └── arm_manager/        #        out-of-tree arm-manager package (arm scopes / perception slot + tools)
+│   ├── ros2/                       #    robot side (colcon packages; build/install/log are build artifacts, not committed)
+│   │   ├── cpp_control/            #     C++ 1kHz scalar PID loop + rate/jitter/compute-time measurement
+│   │   └── sim_bridge/             #     Python simulation bridge (MuJoCo + rclpy)
+│   ├── bridge/                     #    bridge contract
+│   │   ├── contract.md             #      topic/message schema (v1.2)
+│   │   └── bridge_client.py        #     rosbridge client (thin SDK)
+│   └── sim/                        #    visualization assets
+│       ├── models/                 #     MJCF: two_arm_scene.xml (two arms + ball)
+│       └── scenes/                 #     preset scene notes
+├── eval/                           # ★ evaluation
+│   ├── robot/                      #   IK timing magnitude (against public baselines)
+│   ├── agent/                      #   task set & criteria (agent vs oracle vs random evaluation)
+│   ├── hotplug/                    #   hot-plug acceptance suites (assemble-env.sh + drivers + fixtures)
+│   ├── tests/                      #   pytest gates & live suites
+│   ├── lib/                        #   robenv + result aggregation (summary.py)
+│   └── results/                    #   run records (run-* dirs, not committed)
+├── demo/                           # tutorial dirs (00~13, see demo/README.md)
+├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log (+ timestamps)
+└── plugins/                        # dynamic plugin archive (two workflow plugins)
 ```
 
 ---

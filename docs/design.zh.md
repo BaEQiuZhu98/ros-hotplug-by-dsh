@@ -311,37 +311,39 @@
 
 ```
 ros-hotplug-by-dsh/
-├── src/
-│   ├── setup.sh                    #   一键安装(路径集中化: 挂载服务行/面板包/robo preset)
-│   ├── capabilities/              # ★ 能力仓库 + 挂载服务 + 规范
-│   │   ├── capability-spec.md     #   能力开发规范(模板 + manifest + 挂载流程)
-│   │   ├── mount_service/         #   能力挂载服务(host 常驻: sha256 准入 + kind 路由 + 臂/槽上下文管理 + 常驻 bridge daemon)
-│   │   ├── repo/                  #   能力仓库目录(一等交付件): grasp/1.0.0|1.1.0|1.2.0、suction/1.0.0、camera_detect/1.0.0
-│   │   └── pack.sh                #   可选发布外壳: 仓库目录打包成 npm tarball(公开分发用)
+├── README.zh.md / README.md        # 本文件（中 / 英）
+├── LICENSE / .gitignore
+├── src/                            # 源码工程(见 src/README.zh.md)
+│   ├── setup.sh                    #   一键安装(路径集中化: 挂载服务行 / 面板包 / robo preset)
+│   ├── capabilities/               #   ★ 能力仓库 + 挂载服务 + 规范
+│   │   ├── capability-spec.md      #     能力开发规范(模板 + manifest + 挂载流程)
+│   │   ├── mount_service/          #     能力挂载服务(host 常驻: sha256 准入 + kind 路由 + 臂/槽上下文管理 + 常驻 bridge daemon)
+│   │   ├── repo/                   #     能力仓库目录(一等交付件): grasp/1.0.0|1.1.0|1.2.0、suction/1.0.0、camera_detect/1.0.0
+│   │   └── pack.sh                 #     可选发布外壳: 仓库目录打包成 npm tarball(公开分发用)
 │   ├── packages/                   #   树外包 npm 包(安装形态: profile node_modules)
-│   │   └── cap-mount-panel/        #   能力面板(双面: host /cap-mount 路由 + client tsdown bundle)
-│   ├── presets/                   #   运行载体
-│   │   └── robo/                  #   agent.cordis.yml(persona + observer + 臂管理器 + arm_status/take_object + skills)
-│   │       └── arm_manager/       #   臂管理器树外包包(臂作用域/感知槽 + 工具)
-│   ├── ros2/                      #   机器人侧(colcon 包)
-│   │   ├── cpp_control/           #   C++ 高频控制节点(1kHz, PID)
-│   │   └── sim_bridge/            #   Python 仿真桥(MuJoCo + rclpy)
-│   ├── bridge/                    #   桥接契约
-│   │   ├── contract.md            #   话题/消息 schema
-│   │   └── bridge_client.py       #   rosbridge 客户端(SDK 底层)
-│   └── sim/                       #   可视化仿真资源
-│       ├── models/                #   MJCF: 单臂/双臂/夹爪/吸盘/小球
-│       └── scenes/                #   预置场景
-├── eval/                          # ★ 评测
-│   ├── robot/                     #   IK/轨迹/频率(对照公开基线)
-│   ├── agent/                     #   agent vs oracle vs random
-│   ├── hotplug/                   #   热插拔验收套件(隔离环境 + 驱动插件)
-│   ├── tests/                     #   pytest 门禁与实时套件
-│   ├── lib/                       #   结果聚合(summary.py)
-│   └── results/                   #   评测记录(run-* 目录, 不入库)
-├── demo/                          #   教学(00~13, 证据链)
-├── docs/                          #   本设计文档 + 亮点 + 机制 + 留痕
-└── plugins/                       #   动态插件归档(工作流类)
+│   │   └── cap-mount-panel/        #     能力面板(双面: host /cap-mount 路由 + client tsdown bundle)
+│   ├── presets/                    #   运行载体
+│   │   └── robo/                   #     机器人任务 agent preset(组合 + persona + skills)
+│   │       └── arm_manager/        #       臂管理器树外包包(臂作用域/感知槽 + 工具)
+│   ├── ros2/                       #   机器人侧(colcon 包; build/install/log 为构建产物不入库)
+│   │   ├── cpp_control/            #     C++ 1kHz 标量 PID 控制环 + 频率/抖动/耗时实测
+│   │   └── sim_bridge/             #     Python 仿真桥(MuJoCo + rclpy)
+│   ├── bridge/                     #   桥接契约
+│   │   ├── contract.md             #     话题/消息 schema(v1.2)
+│   │   └── bridge_client.py        #     rosbridge 客户端(SDK 薄封装)
+│   └── sim/                        #   可视化仿真资源
+│       ├── models/                 #     MJCF: two_arm_scene.xml(双臂 + 小球)
+│       └── scenes/                 #     预置场景说明
+├── eval/                           # ★ 评测
+│   ├── robot/                      #   IK 耗时量级(对照公开基线)
+│   ├── agent/                      #   任务集与口径(agent vs oracle vs random 评测)
+│   ├── hotplug/                    #   热插拔验收套件(assemble-env.sh + drivers + fixtures)
+│   ├── tests/                      #   pytest 门禁与实时套件
+│   ├── lib/                        #   robenv + 结果聚合(summary.py)
+│   └── results/                    #   评测记录(run-* 目录, 不入库)
+├── demo/                           # 教学目录(00~13, 见 demo/README.zh.md)
+├── docs/                           # design / novelty / glossary / 时空组合性 / disclosure-log(+ timestamps)
+└── plugins/                        # 动态插件归档(两个工作流插件)
 ```
 
 ### 10.2 交付件总览（L0~L6）

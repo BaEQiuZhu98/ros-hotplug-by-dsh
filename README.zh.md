@@ -4,17 +4,6 @@
 
 ---
 
-## 作者背景
-
-| 维度 | 现状 |
-|---|---|
-| **强项** | C / Python / Linux 底层；分布式系统；实时转发与协议栈优化；高可用与安全敏感系统（主备冗余、灰度升级、异常秒级回滚、99.9% 可用性、零信任安全流水线、发布/订阅解耦）；AI 辅助研发工程化；项目交付 |
-| **机器人与大模型知识** | 沿 demo 教学路线（demo/00 起）从零学起，覆盖 ROS2 / 运动学 / 仿真 / DSH agent 开发 |
-
-> **定位**：用「系统工程 + 可靠性」的强项切入「具身机器人软件 × DSH agent」这个交叉点。所有机器人与大模型知识，一律在 demo 中按顺序从零学起，本项目不做任何「默认你已经会」的假设。
-
----
-
 ## 新颖性主张（一句话）
 
 > **率先将 DSH 的时空组合性（分层作用域 + Cordis 生命周期）应用于具身机器人能力的热插拔，并给出可复现实现与验证。**
@@ -32,18 +21,38 @@
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # 本文件（中 / 英）
-├── docs/                           # design(设计) / novelty(现状与亮点) / glossary(名词概念) / 时空组合性 / disclosure-log
+├── LICENSE / .gitignore
 ├── src/                            # 源码工程(见 src/README.zh.md)
-│   ├── capabilities/               #   能力仓库(repo) + 挂载服务(mount_service) + 规范 + 挂载守卫
-│   ├── presets/robo/               #   机器人任务 agent preset(persona + observer + 臂管理器 + arm_status/take_object + skills)
-│   ├── ros2/                       #   sim_bridge(双臂仿真桥) + cpp_control(1kHz 控制)
-│   ├── bridge/                     #   桥接契约 + 薄 SDK
-│   └── sim/                        #   MuJoCo 模型与场景
-├── eval/                           # 评测(robot / agent / hotplug / tests)
-├── plugins/                        # 动态 Cordis 插件归档
-└── demo/                           # 教学目录（见 demo/README.zh.md）
-    ├── 00-dsh-quickstart/ ... 13-hotplug/
-    └── 13-hotplug/                 # ★ 旗舰 demo：机器人能力热插拔（含可靠性设计）
+│   ├── setup.sh                    #   一键安装(路径集中化: 挂载服务行 / 面板包 / robo preset)
+│   ├── capabilities/               #   ★ 能力仓库 + 挂载服务 + 规范
+│   │   ├── capability-spec.md      #     能力开发规范(模板 + manifest + 挂载流程)
+│   │   ├── mount_service/          #     能力挂载服务(host 常驻: sha256 准入 + kind 路由 + 臂/槽上下文管理 + 常驻 bridge daemon)
+│   │   ├── repo/                   #     能力仓库目录(一等交付件): grasp/1.0.0|1.1.0|1.2.0、suction/1.0.0、camera_detect/1.0.0
+│   │   └── pack.sh                 #     可选发布外壳: 仓库目录打包成 npm tarball(公开分发用)
+│   ├── packages/                   #   树外包 npm 包(安装形态: profile node_modules)
+│   │   └── cap-mount-panel/        #     能力面板(双面: host /cap-mount 路由 + client tsdown bundle)
+│   ├── presets/                    #   运行载体
+│   │   └── robo/                   #     机器人任务 agent preset(组合 + persona + skills)
+│   │       └── arm_manager/        #       臂管理器树外包包(臂作用域/感知槽 + 工具)
+│   ├── ros2/                       #   机器人侧(colcon 包; build/install/log 为构建产物不入库)
+│   │   ├── cpp_control/            #     C++ 1kHz 标量 PID 控制环 + 频率/抖动/耗时实测
+│   │   └── sim_bridge/             #     Python 仿真桥(MuJoCo + rclpy)
+│   ├── bridge/                     #   桥接契约
+│   │   ├── contract.md             #     话题/消息 schema(v1.2)
+│   │   └── bridge_client.py        #     rosbridge 客户端(SDK 薄封装)
+│   └── sim/                        #   可视化仿真资源
+│       ├── models/                 #     MJCF: two_arm_scene.xml(双臂 + 小球)
+│       └── scenes/                 #     预置场景说明
+├── eval/                           # ★ 评测
+│   ├── robot/                      #   IK 耗时量级(对照公开基线)
+│   ├── agent/                      #   任务集与口径(agent vs oracle vs random 评测)
+│   ├── hotplug/                    #   热插拔验收套件(assemble-env.sh + drivers + fixtures)
+│   ├── tests/                      #   pytest 门禁与实时套件
+│   ├── lib/                        #   robenv + 结果聚合(summary.py)
+│   └── results/                    #   评测记录(run-* 目录, 不入库)
+├── demo/                           # 教学目录(00~13, 见 demo/README.zh.md)
+├── docs/                           # design / novelty / glossary / 时空组合性 / disclosure-log(+ timestamps)
+└── plugins/                        # 动态插件归档(两个工作流插件)
 ```
 
 ---

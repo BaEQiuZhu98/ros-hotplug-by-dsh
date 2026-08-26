@@ -287,35 +287,39 @@ Three reasons for MuJoCo: ① the main line is motion control (MuJoCo's strength
 
 ```
 ros-hotplug-by-dsh/
-├── src/
+├── README.zh.md / README.md        # this file (zh / en)
+├── LICENSE / .gitignore
+├── src/                            # source engineering (see src/README.zh.md)
 │   ├── setup.sh                    #    one-shot install (path centralization: mount row / panel pkg / robo preset)
-│   ├── capabilities/              # ★ capability repo + mount service + spec
-│   │   ├── capability-spec.md     #    capability dev spec (template + manifest + mount flow)
-│   │   ├── mount_service/         #    capability mount service (host-resident: sha256 admission + kind routing + arm/slot context bookkeeping + resident bridge daemon)
-│   │   ├── repo/                  #    capability repo directory (first-class deliverable): grasp/1.0.0|1.1.0|1.2.0, suction/1.0.0, camera_detect/1.0.0
-│   │   └── pack.sh                #    optional distribution shell: repo dir → npm tarball
+│   ├── capabilities/               #    ★ capability repo + mount service + spec
+│   │   ├── capability-spec.md      #      capability dev spec (template + manifest + mount flow)
+│   │   ├── mount_service/          #      capability mount service (host-resident: sha256 admission + kind routing + arm/slot context bookkeeping + resident bridge daemon)
+│   │   ├── repo/                   #      capability repo directory (first-class deliverable): grasp/1.0.0|1.1.0|1.2.0, suction/1.0.0, camera_detect/1.0.0
+│   │   └── pack.sh                 #      optional distribution shell: repo dir → npm tarball
 │   ├── packages/                   #    out-of-tree npm packages (installed into profile node_modules)
-│   │   └── cap-mount-panel/        #    end-effector panel (dual-face: host /cap-mount route + client tsdown bundle)
-│   ├── presets/                   #    runtime carrier
-│   │   └── robo/                  #    agent.cordis.yml (persona + observer + arm manager + arm_status/take_object + skills)
-│   │       └── arm_manager/       #    out-of-tree arm-manager package (arm scopes / perception slot + tools)
-│   ├── ros2/                      #    robot side (colcon packages)
-│   │   ├── cpp_control/           #    C++ high-rate control node (1kHz, PID)
-│   │   └── sim_bridge/            #    Python simulation bridge (MuJoCo + rclpy)
-│   ├── bridge/                    #    bridge contract
-│   │   ├── contract.md            #    topic/message schema
-│   │   └── bridge_client.py       #    rosbridge client (SDK base)
-│   └── sim/                       #    visualization assets
-│       ├── models/                #    MJCF: arms/gripper/suction/ball
-│       └── scenes/                #    preset scenes
-├── eval/                          # ★ evaluation
-│   ├── robot/  agent/  hotplug/
-│   ├── tests/                     #   pytest gates & live suites
-│   ├── lib/                       #   result aggregation (summary.py)
-│   └── results/                   #   run records (run-* dirs, not committed)
-├── demo/                          #   teaching (00~13, the evidence chain)
-├── docs/                          #   this design doc + highlights + mechanism + receipts
-└── plugins/                       #   dynamic plugin archive (workflow helpers)
+│   │   └── cap-mount-panel/        #      capability panel (dual-face: host /cap-mount route + client tsdown bundle)
+│   ├── presets/                    #    runtime carrier
+│   │   └── robo/                   #      robot task agent preset (composition + persona + skills)
+│   │       └── arm_manager/        #        out-of-tree arm-manager package (arm scopes / perception slot + tools)
+│   ├── ros2/                       #    robot side (colcon packages; build/install/log are build artifacts, not committed)
+│   │   ├── cpp_control/            #     C++ 1kHz scalar PID loop + rate/jitter/compute-time measurement
+│   │   └── sim_bridge/             #     Python simulation bridge (MuJoCo + rclpy)
+│   ├── bridge/                     #    bridge contract
+│   │   ├── contract.md             #      topic/message schema (v1.2)
+│   │   └── bridge_client.py        #     rosbridge client (thin SDK)
+│   └── sim/                        #    visualization assets
+│       ├── models/                 #     MJCF: two_arm_scene.xml (two arms + ball)
+│       └── scenes/                 #     preset scene notes
+├── eval/                           # ★ evaluation
+│   ├── robot/                      #   IK timing magnitude (against public baselines)
+│   ├── agent/                      #   task set & criteria (agent vs oracle vs random evaluation)
+│   ├── hotplug/                    #   hot-plug acceptance suites (assemble-env.sh + drivers + fixtures)
+│   ├── tests/                      #   pytest gates & live suites
+│   ├── lib/                        #   robenv + result aggregation (summary.py)
+│   └── results/                    #   run records (run-* dirs, not committed)
+├── demo/                           # tutorial dirs (00~13, see demo/README.md)
+├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log (+ timestamps)
+└── plugins/                        # dynamic plugin archive (two workflow plugins)
 ```
 
 ### 10.2 Deliverable overview (L0~L6)
