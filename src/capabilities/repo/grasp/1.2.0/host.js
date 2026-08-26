@@ -12,8 +12,14 @@
 export const name = 'capability-grasp'
 export const inject = ['tools', 'capabilityMount']
 
-// 盲抓预设点(workspace 系): 与球初始位置 (0.5, 0) 可区分; 视觉拦截器注入 target 后走精准分支.
-const PRESET_POINT = [0.3, -0.3]
+// 盲抓预设点(workspace 系, 按臂区分): 与球初始位置 (0.5, 0) 可区分; 视觉拦截器注入
+// target 后走精准分支. 点取各臂基座内侧附近(基座 A [0,-0.5] / B [0,0.5]): 相对该臂
+// 基座的偏移 |r|≈0.36 < 0.8 必可达——若两臂共用 A 侧预设点, B 的相对偏移 |r|≈0.85
+// 超出可达半径, sim 拒绝移动, move_to 只能超时(盲抓失败而非"未命中").
+const PRESET_POINTS = {
+  A: [0.3, -0.3],
+  B: [0.3, 0.3],
+}
 const HIT_RADIUS = 0.05
 
 export function apply(ctx, config = {}) {
@@ -43,8 +49,9 @@ export function apply(ctx, config = {}) {
     if (seen.tools[arm] !== 'grasp') {
       return '臂 ' + arm + ' 当前末端是 "' + (seen.tools[arm] || 'none') + '", 不是夹爪, 无法夹取(请先在面板给该臂挂夹爪)'
     }
-    // 策略第 2 步: 执行(收敛完成式移动: 精准目标 或 盲抓预设点).
-    const target = Array.isArray(req.target) && req.target.length === 2 ? req.target : PRESET_POINT
+    // 策略第 2 步: 执行(收敛完成式移动: 精准目标 或 该臂盲抓预设点).
+    const preset = PRESET_POINTS[arm] || PRESET_POINTS.A
+    const target = Array.isArray(req.target) && req.target.length === 2 ? req.target : preset
     const mv = await runCli('move_to', [arm, target[0], target[1]])
     if (!mv.ok) return '臂 ' + arm + ' 夹取失败: ' + mv.error
     // 策略第 3 步: 命中判定(末端位置 vs 球位置, workspace 系; 距离阈值 0.05m).

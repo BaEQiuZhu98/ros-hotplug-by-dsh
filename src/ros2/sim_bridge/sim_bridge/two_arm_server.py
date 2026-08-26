@@ -9,6 +9,7 @@ sim_bridge - 双臂仿真桥(阶段 0 固化, 由 demo/13 two_arm_server.py 升�
   /tool_config(String)    - 载荷 "ARM:TOOL", 切换臂的末端执行器(grasp/suction/none).
   /ball_position(String)  - 载荷 "x,y", 设置小球 XY 位置(z 固定 0.5).
   /touch_command(String)  - 载荷 "A"|"B", 让该臂末端去触碰小球.
+  /home_command(String)   - 载荷 "A"|"B", 该臂关节回原位(伸直, 不动末端与小球).
 发布:
   /joint_state(String)    - 载荷 JSON(10 Hz), 格式见 bridge/contract.md v1.0.
 
@@ -115,6 +116,7 @@ class TwoArmServer(Node):
         self.create_subscription(String, 'move_to', self.on_move_to, 10)
         self.create_subscription(String, 'ball_position', self.on_ball_position, 10)
         self.create_subscription(String, 'reset_command', self.on_reset, 10)
+        self.create_subscription(String, 'home_command', self.on_home, 10)
 
         self.state_pub = self.create_publisher(String, 'joint_state', 10)
         self.create_timer(1.0 / JOINT_STATE_RATE, self.publish_joint_state)
@@ -130,6 +132,15 @@ class TwoArmServer(Node):
         self.ball = np.array([0.5, 0.0])
         self.data.mocap_pos[self.ball_mocap] = [0.5, 0.0, 0.5]
         self.get_logger().info('全部复位: 关节归零, 末端卸下, 小球回 (0.5, 0)')
+
+    def on_home(self, msg):
+        # 单臂回原位(面板「臂X复位」): 该臂关节目标归零(平滑回伸直), 不动末端/小球/另一臂.
+        arm = msg.data
+        if arm not in ARMS:
+            self.get_logger().warn('非法臂: %s' % arm)
+            return
+        self.targets[arm] = np.array([0.0, 0.0])
+        self.get_logger().info('臂 %s 回原位(关节归零)' % arm)
 
     def on_tool_config(self, msg):
         # 载荷格式 "A:grasp" / "B:suction" / "A:none".

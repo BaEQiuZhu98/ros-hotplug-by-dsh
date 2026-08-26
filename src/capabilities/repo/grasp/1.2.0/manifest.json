@@ -3,8 +3,8 @@
     "name": "grasp",
     "version": "1.2.0",
     "kind": "end-effector",
-    "description": "夹爪末端: 夹取策略 + waterfall 执行链扩展点(盲/精准分支 + 命中判定)",
+    "description": "夹爪末端: 夹取策略 + waterfall 执行链扩展点(盲/精准分支 + 命中判定 + 按臂盲抓预设点)",
     "tool": "host.js",
-    "sha256": "15205dffdc812293dbd2341b4cf830e34bcda41806ceb6fb9a0f8667e50d28b9"
+    "sha256": "50d320826435a7dad96cb9e133447d3f3c40e95c47c94032602214463c4ac833"
   }
 }

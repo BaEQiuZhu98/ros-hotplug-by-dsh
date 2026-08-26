@@ -47,6 +47,44 @@ export function apply(ctx) {
       case 'cap_list': {
         return svc.list()
       }
+      case 'query_state': {
+        // 刷新统一入口: 挂载清单 + 物理状态(小球位置/末端/关节)一次拿全.
+        const list = svc.list()
+        const caps = await svc.bridge('query_capabilities', [])
+        return {
+          ok: true, list: list,
+          caps: caps.ok === true ? caps.caps : null,
+          capsError: caps.ok === true ? '' : String(caps.error || JSON.stringify(caps)),
+        }
+      }
+      case 'set_ball': {
+        // 设定小球 XY 位置(x/y 必须是数字; 有限性由 bridge/sim 侧校验).
+        const x = args && args.x
+        const y = args && args.y
+        if (x === undefined || x === null || x === '' || y === undefined || y === null || y === '') {
+          return { ok: false, error: '缺少小球位置(x 和 y 都要填)' }
+        }
+        const r = await svc.bridge('set_ball', [Number(x), Number(y)])
+        if (r.ok !== true) return r
+        // 回读确认小球位置已更新(用户设定后立即看到实际位置).
+        const q = await svc.bridge('query_capabilities', [])
+        const ball = q.ok === true && q.caps && Array.isArray(q.caps.ball) ? q.caps.ball : null
+        return { ok: true, output: '小球已设定到 (' + x + ', ' + y + ')', ball: ball }
+      }
+      case 'arm_reset': {
+        // 单臂复位: 卸载该臂挂载(无挂载也继续) + 物理末端复位 none + 关节回原位(伸直).
+        const arm = String(args && args.arm)
+        const r = await svc.unmount(arm)
+        if (!r.ok && r.error !== '臂 ' + arm + ' 没有挂载末端') return r
+        const ph = await svc.bridge('set_tool', [arm, 'none'])
+        const home = await svc.bridge('home', [arm])
+        return {
+          ok: true, arm: arm,
+          output: r.ok ? ('已卸载 ' + r.cap + '@' + r.version + ', 末端复位, 回原位') : '该臂无挂载, 末端复位, 回原位',
+          physical: { ok: ph.ok === true, output: JSON.stringify(ph) },
+          home: { ok: home.ok === true, output: JSON.stringify(home) },
+        }
+      }
       case 'arm_mount': {
         const arm = String(args && args.arm)
         const cap = String(args && args.cap)

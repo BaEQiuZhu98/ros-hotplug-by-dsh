@@ -262,6 +262,7 @@ export function apply(ctx, config = {}) {
 
   function registerArms(armsBySession) {
     const registered = []
+    const pendingMounts = []
     for (const arm of Object.keys(armsBySession || {})) {
       const target = armsBySession[arm]
       if (target === undefined || target === null) continue
@@ -271,18 +272,49 @@ export function apply(ctx, config = {}) {
       }
       armContexts.get(arm).push(target)
       registered.push({ arm, ctx: target })
+      // 新上下文补挂当前末端(懒补建的会话臂作用域须立即获得已挂实例): 挂载记录
+      // 是"人给该臂装末端"的全局事实, 任何会话的该臂上下文都应带上当前实例.
+      const cur = armsByArm.get(arm)
+      if (cur !== undefined) pendingMounts.push({ arm, ctx: target, cap: cur.cap, version: cur.version, plugin: cur.plugin })
     }
     console.log('[cap-mount-service] 臂上下文注册: %s', arms.map((a) => a + '=' + armContexts.get(a).length + ' 套').join(', '))
+    const pendingTasks = []
+    for (const p of pendingMounts) {
+      pendingTasks.push(enqueueArm(p.arm, async () => {
+        const curNow = armsByArm.get(p.arm)
+        if (curNow === undefined || curNow.cap !== p.cap || curNow.version !== p.version) return
+        const r = await mountOnContext(p.ctx, p.plugin, p.arm)
+        if (r.ok) {
+          const curAfter = armsByArm.get(p.arm)
+          if (curAfter !== undefined && curAfter.cap === p.cap && curAfter.version === p.version) {
+            curAfter.fibers.push({ dispose: r.dispose, ctx: p.ctx })
+            console.log('[cap-mount-service] 臂 %s 新上下文补挂 %s@%s 成功', p.arm, p.cap, p.version)
+          } else {
+            try { r.dispose() } catch (e) { console.warn('[cap-mount-service] 臂 %s 补挂过期回收失败: %s', p.arm, e && e.message) }
+          }
+        } else {
+          console.warn('[cap-mount-service] 臂 %s 新上下文补挂失败: %s', p.arm, r.error)
+        }
+      }))
+    }
     // 返回对称注销函数(按对象引用删除): 会话关闭时臂管理器调用, 防悬垂上下文与数组膨胀.
-    return function unregisterArms() {
+    // 同时摘除该上下文上的实例 fiber(随会话作用域销毁, 挂载服务不再持有).
+    // fn.pending 供调用方(臂管理器懒补建路径)等待补挂全部完成后再解析实例.
+    const unregisterArms = function unregisterArms() {
       for (const { arm, ctx: target } of registered) {
         const list = armContexts.get(arm)
         if (list === undefined) continue
         const index = list.indexOf(target)
         if (index !== -1) list.splice(index, 1)
+        const cur = armsByArm.get(arm)
+        if (cur !== undefined) {
+          cur.fibers = cur.fibers.filter((f) => f.ctx !== target)
+        }
       }
       console.log('[cap-mount-service] 臂上下文注销: %s', arms.map((a) => a + '=' + armContexts.get(a).length + ' 套').join(', '))
     }
+    unregisterArms.pending = Promise.all(pendingTasks)
+    return unregisterArms
   }
 
   // 感知槽(场景扩展): slot -> [ctx...]  smer 类能力挂载点(标签 = agent key, 每会话一套).
@@ -296,13 +328,42 @@ export function apply(ctx, config = {}) {
     list.push(ctx)
     slotContexts.set(slot, list)
     console.log('[cap-mount-service] 感知槽上下文注册: %s=%d 套', slot, list.length)
-    return function unregisterSlot() {
-      const cur = slotContexts.get(slot)
-      if (cur === undefined) return
-      const index = cur.indexOf(ctx)
-      if (index !== -1) cur.splice(index, 1)
-      console.log('[cap-mount-service] 感知槽上下文注销: %s=%d 套', slot, cur.length)
+    // 新槽上下文补挂当前感知能力(懒补建的会话须立即获得已挂 sensor 实例).
+    const cur = slotsBySlot.get(slot)
+    const pendingTasks = []
+    if (cur !== undefined) {
+      pendingTasks.push(enqueueSlot(slot, async () => {
+        const curNow = slotsBySlot.get(slot)
+        if (curNow === undefined || curNow.cap !== cur.cap || curNow.version !== cur.version) return
+        const r = await mountOnContext(ctx, cur.plugin, slot)
+        if (r.ok) {
+          const curAfter = slotsBySlot.get(slot)
+          if (curAfter !== undefined && curAfter.cap === cur.cap && curAfter.version === cur.version) {
+            curAfter.fibers.push({ dispose: r.dispose, ctx })
+            console.log('[cap-mount-service] 槽 %s 新上下文补挂 %s@%s 成功', slot, cur.cap, cur.version)
+          } else {
+            try { r.dispose() } catch (e) { console.warn('[cap-mount-service] 槽 %s 补挂过期回收失败: %s', slot, e && e.message) }
+          }
+        } else {
+          console.warn('[cap-mount-service] 槽 %s 新上下文补挂失败: %s', slot, r.error)
+        }
+      })
+      )
     }
+    // 返回对称注销函数; fn.pending 供臂管理器懒补建路径等待补挂完成.
+    const unregisterSlot = function unregisterSlot() {
+      const curList = slotContexts.get(slot)
+      if (curList === undefined) return
+      const index = curList.indexOf(ctx)
+      if (index !== -1) curList.splice(index, 1)
+      const mounted = slotsBySlot.get(slot)
+      if (mounted !== undefined) {
+        mounted.fibers = mounted.fibers.filter((f) => f.ctx !== ctx)
+      }
+      console.log('[cap-mount-service] 感知槽上下文注销: %s=%d 套', slot, curList.length)
+    }
+    unregisterSlot.pending = Promise.all(pendingTasks)
+    return unregisterSlot
   }
 
   // 作用域化事件织入助手(P1): 实现由臂管理器注入(臂管理器是 profile 包, 可解析
@@ -400,7 +461,7 @@ export function apply(ctx, config = {}) {
           const restored = []
           for (const targetCtx of contexts) {
             const rr = await mountOnContext(targetCtx, cur.plugin, slot)
-            if (rr.ok) restored.push({ dispose: rr.dispose })
+            if (rr.ok) restored.push({ dispose: rr.dispose, ctx: targetCtx })
           }
           if (restored.length > 0) {
             slotsBySlot.set(slot, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
@@ -412,7 +473,7 @@ export function apply(ctx, config = {}) {
         }
         return { ok: false, error: r.error, restored: false }
       }
-      fibers.push({ dispose: r.dispose })
+      fibers.push({ dispose: r.dispose, ctx: targetCtx })
     }
     slotsBySlot.set(slot, { cap, version, fibers, plugin: loaded.plugin })
     return { ok: true, slot, cap, version }
@@ -471,7 +532,7 @@ export function apply(ctx, config = {}) {
           const restored = []
           for (const targetCtx of contexts) {
             const rr = await mountOnContext(targetCtx, cur.plugin, arm)
-            if (rr.ok) restored.push({ dispose: rr.dispose })
+            if (rr.ok) restored.push({ dispose: rr.dispose, ctx: targetCtx })
           }
           if (restored.length > 0) {
             armsByArm.set(arm, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
@@ -483,7 +544,7 @@ export function apply(ctx, config = {}) {
         }
         return { ok: false, error: r.error, restored: false }
       }
-      fibers.push({ dispose: r.dispose })
+      fibers.push({ dispose: r.dispose, ctx: targetCtx })
     }
     armsByArm.set(arm, { cap, version, fibers, plugin: loaded.plugin })
     return { ok: true, arm, cap, version }

@@ -56,7 +56,12 @@ export function apply(ctx) {
     )
     const armsBySession = Object.fromEntries(armList.map((arm, i) => [arm, scopes[i].ctx]))
     const unregister = ctx.capabilityMount.registerArms(armsBySession)
-    sessionArms.set(agent, { keys, scopes, unregister, slotScope, slotUnregister })
+    // 懒补建路径: 挂载服务会为新上下文异步补挂当前能力, 工具执行前须等补挂落位.
+    const pending = Promise.all([
+      unregister && unregister.pending ? unregister.pending : Promise.resolve(),
+      slotUnregister && slotUnregister.pending ? slotUnregister.pending : Promise.resolve(),
+    ])
+    sessionArms.set(agent, { keys, scopes, unregister, slotScope, slotUnregister, pending })
     console.log('[robo-arm-manager] 臂作用域已就绪: %s', armList.join(', '))
   }
 
@@ -86,8 +91,19 @@ export function apply(ctx) {
   }
 
   // 工具执行时按调用者 agent 解析该会话的臂作用域(工具本体经 exec.agent 拿身份).
+  // 懒补建兜底: 新建/恢复的会话可能错过 agent/created 与启动时的 list() 兜底
+  // (如 web 新建会话的 announce 早于 preset standing 挂链), 首次工具执行时按
+  // exec.agent 就地补建臂上下文与感知槽, 保证本会话臂能力始终可解析.
   function sessionEntryOf(exec) {
-    return sessionArms.get(exec && exec.agent)
+    const agent = exec && exec.agent
+    if (agent !== undefined && agent !== null && !sessionArms.has(agent)) {
+      try {
+        setupSession(agent)
+      } catch (e) {
+        console.warn('[robo-arm-manager] 懒补建臂上下文失败: %s', e && e.message)
+      }
+    }
+    return sessionArms.get(agent)
   }
 
   // 经挂载服务常驻 bridge 调用 SDK(与能力实例同通道, 不再 spawn python; 审查 v1 N3).
@@ -112,6 +128,7 @@ export function apply(ctx) {
     async execute(args, exec) {
       const entry = sessionEntryOf(exec)
       if (entry === undefined) return JSON.stringify({ ready: false, reason: '没有本会话的臂上下文' })
+      if (entry.pending !== undefined) await entry.pending
       const arm = String(args && args.arm)
       // 1) 实例存在性: 该会话该臂作用域上是否有 manipulate 实例.
       const inst = ctx.tools.get('manipulate', entry.keys[arm])
@@ -146,6 +163,7 @@ export function apply(ctx) {
     async execute(args, exec) {
       const entry = sessionEntryOf(exec)
       if (entry === undefined) return '没有本会话的臂上下文, 无法拿东西'
+      if (entry.pending !== undefined) await entry.pending
       const arm = String(args && args.arm)
       const inst = ctx.tools.get('manipulate', entry.keys[arm])
       if (inst === undefined) return '臂 ' + arm + ' 没有末端实例, 无法拿东西(请先在面板给该臂挂末端)'

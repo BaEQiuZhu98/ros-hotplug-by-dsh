@@ -9,7 +9,9 @@ bridge_client.py - 桥接薄 SDK(阶段 0 固化, 由 demo/12 的 bridge_client.
     connect()                   建立 rosbridge 连接
     set_tool(arm, tool)         切末端执行器(arm ∈ {A,B}; tool ∈ {grasp,suction,none})
     set_ball(x, y)              设置小球位置(有限数字)
+    home(arm)                   该臂关节回原位(伸直, 不动末端与小球)
     touch(arm)                  选臂触碰小球
+    move_to(arm, x, y, timeout) 收敛完成式移动到指定 XY(契约 v1.2, 返回 {ok, ee, ball})
     query_capabilities(wait)    读 /joint_state 回传, 返回当前能力集
     close()                     断开连接
 
@@ -98,6 +100,12 @@ class Bridge:
         if not (math.isfinite(fx) and math.isfinite(fy)):
             return {'ok': False, 'error': '小球位置必须是有限数字, 收到 %r, %r' % (x, y)}
         return self._publish('/ball_position', '%s,%s' % (fx, fy))
+
+    def home(self, arm):
+        """该臂关节回原位(伸直). 只动指定臂, 不改变末端装配与小球."""
+        if arm not in VALID_ARMS:
+            return {'ok': False, 'error': '非法臂 "%s", 只能是 A 或 B' % arm}
+        return self._publish('/home_command', arm)
 
     def touch(self, arm):
         """选臂触碰小球. 若该臂无末端, sim_bridge 侧会拒绝并告警."""
@@ -204,7 +212,7 @@ class Bridge:
 
 def daemon_main():
     """常驻模式(P2-10): stdin 逐行读 JSON 命令, 复用同一条 rosbridge 连接, stdout 逐行回 JSON.
-    命令: {"method": "set_tool|set_ball|touch|reset|query_capabilities", "args": [...]}
+    命令: {"method": "set_tool|set_ball|home|touch|move_to|reset|query_capabilities", "args": [...]}
     首行输出 {"ok": true, "daemon": "ready"} 表示就绪; 之后每请求一行响应."""
     import sys
     bridge = Bridge()
@@ -235,6 +243,8 @@ def daemon_main():
             result = bridge.set_tool(args[0], args[1])
         elif method == 'set_ball' and len(args) >= 2:
             result = bridge.set_ball(args[0], args[1])
+        elif method == 'home' and len(args) >= 1:
+            result = bridge.home(args[0])
         elif method == 'touch' and len(args) >= 1:
             result = bridge.touch(args[0])
         elif method == 'move_to' and len(args) >= 3:
@@ -257,7 +267,7 @@ if __name__ == '__main__':
 
     if len(_sys.argv) < 2:
         # 失败路径统一输出 JSON(契约 §5, T-A-28): 参数不足也是 {ok:false} + 退出码 1.
-        print(json.dumps({'ok': False, 'error': '用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|touch ARM|reset|query_capabilities|daemon>'},
+        print(json.dumps({'ok': False, 'error': '用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|home ARM|touch ARM|reset|query_capabilities|daemon>'},
                          ensure_ascii=False))
         _sys.exit(1)
     method = _sys.argv[1]
@@ -274,6 +284,8 @@ if __name__ == '__main__':
             result = bridge.set_tool(_sys.argv[2], _sys.argv[3])
         elif method == 'set_ball' and len(_sys.argv) >= 4:
             result = bridge.set_ball(_sys.argv[2], _sys.argv[3])
+        elif method == 'home' and len(_sys.argv) >= 3:
+            result = bridge.home(_sys.argv[2])
         elif method == 'touch' and len(_sys.argv) >= 3:
             result = bridge.touch(_sys.argv[2])
         elif method == 'move_to' and len(_sys.argv) >= 5:
