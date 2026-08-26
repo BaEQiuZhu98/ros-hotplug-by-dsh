@@ -3,7 +3,7 @@
 <package format="3">
   <name>sim_bridge</name>
   <version>0.1.0</version>
-  <description>MuJoCo two-arm simulator bridge: subscribes tool_config/touch_command/ball_position, publishes joint_state (contract v1.0)</description>
+  <description>MuJoCo two-arm simulator bridge: subscribes tool_config/touch_command/ball_position/move_to/home_command/reset_command, publishes joint_state (contract v1.2)</description>
   <maintainer email="1095897362@qq.com">BaEQiuZhu98</maintainer>
   <license>MIT</license>
 

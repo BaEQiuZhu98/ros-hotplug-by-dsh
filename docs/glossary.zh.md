@@ -44,8 +44,7 @@
 | manifest | 能力元数据 + 代码哈希 | 挂载前校验用 |
 | 挂载守卫（mount_guard） | 挂载前验哈希的闸（零信任） | `src/capabilities/mount_service/host.js`（`loadPlugin()` 内联 sha256 比对） |
 | 零信任 / 哈希校验 | 每次挂载都假设不可信，先验身再上机 | 篡改 manifest → 拒绝挂载 |
-
-| 多版本共存（主备） | 同一能力多个版本目录并存、互不覆盖 | repo 下 v1/v2/v3 目录 |
+| 多版本共存 | 同一能力多个版本目录并存、互不覆盖 | repo 下 v1/v2/v3 目录 |
 | 换版切换 | 该臂卸载旧实例 + 挂载新实例，arm_status/take_object 语义不变，agent 无感 | 臂作用域 unmount + mount |
 | 回滚 | 换挂失败自动恢复旧实例(尽力, 恢复失败显式告警) | 注入坏版本 → 旧末端恢复可用 |
 | 事件通知 | 能力增删广播，agent 订阅感知 | 观测 agent + `tools/change` |

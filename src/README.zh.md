@@ -12,7 +12,7 @@
 | `presets/robo/` | 机器人任务 agent preset(persona + observer + 臂管理器 + arm_status/take_object + skills) |
 | `ros2/sim_bridge/` | Python 仿真桥(双臂 MuJoCo, 订阅 tool_config/touch_command/ball_position/move_to/home_command/reset_command, 发布 /joint_state) |
 | `ros2/cpp_control/` | C++ 高频控制循环(1 kHz PID + 频率/抖动/耗时实测) |
-| `bridge/` | 消息契约(`contract.md`) + 薄 SDK(`bridge_client.py`) + 验证脚本(`example_drive.py`) |
+| `bridge/` | 消息契约(`contract.md`) + 薄 SDK(`bridge_client.py`) |
 | `sim/models/` `sim/scenes/` | MJCF 模型与预置场景(唯一模型来源) |
 
 ## 快速安装(setup.sh)
@@ -46,11 +46,14 @@ source /opt/ros/humble/setup.bash && source /root/venvs/robo/bin/activate
 python3 src/ros2/sim_bridge/sim_bridge/two_arm_server.py        # 或加 --view 可视化
 # 安装版: colcon build 后 ros2 run sim_bridge two_arm_server [--view]
 
-# 终端 3: 验证脚本(经 SDK 切末端/设球/触球/复位/读能力集)
-/root/venvs/robo/bin/python3 src/bridge/example_drive.py
+# 终端 3: 经 SDK 薄客户端验证(切末端/设球/触球/回原位/复位/读能力集)
+/root/venvs/robo/bin/python3 src/bridge/bridge_client.py set_tool A grasp
+/root/venvs/robo/bin/python3 src/bridge/bridge_client.py set_ball 0.4 0.1
+/root/venvs/robo/bin/python3 src/bridge/bridge_client.py query_capabilities
+# 其余方法: home ARM / touch ARM / move_to ARM x y / reset; 自动化验证见 eval/tests/test_bridge_live.py
 ```
 
-预期: 每步返回 ok; sim_bridge 日志出现 tool_config/touch_command; 读回 `tools = {"A": "grasp", "B": "suction"}`.
+预期: 每步返回 ok; sim_bridge 日志出现 tool_config/ball_position; 读回 tools 与 ball 与操作一致.
 
 ## 热插拔验证(设计 §7.8/§7.12)
 

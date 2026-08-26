@@ -36,6 +36,13 @@
 > 离线验证命令（任何人可复核）：
 > `openssl ts -verify -data DESIGN.zh.md -in docs/timestamps/DESIGN.zh.md.tsr -CAfile docs/timestamps/freetsa-cacert.pem`
 
+> **原文件已改名/合并**：盖戳文件 `DESIGN.zh.md` 现为 `design.zh.md`（合并入设计文档），
+> `novelty-claim.zh.md` 现为 `novelty.zh.md`（合并入现状与亮点文档），内容此后多次刷新，
+> 当前文件与回执中的哈希不再一致——这不影响时间锚（哈希回执 + 首次提交 commit +
+> 推送时间联合支撑优先权）。复核请取盖戳时刻的 git 历史版本，例如：
+> `git show <首次提交 hash>:DESIGN.zh.md > /tmp/DESIGN.zh.md`，
+> 再对 /tmp/DESIGN.zh.md 执行上述 openssl 校验；`novelty-claim.zh.md` 同理。
+
 ---
 
 ## 3. 公开传播

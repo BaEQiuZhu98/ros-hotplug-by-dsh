@@ -74,13 +74,20 @@ export function apply(ctx) {
       case 'arm_reset': {
         // 单臂复位: 卸载该臂挂载(无挂载也继续) + 物理末端复位 none + 关节回原位(伸直).
         const arm = String(args && args.arm)
-        const r = await svc.unmount(arm)
-        if (!r.ok && r.error !== '臂 ' + arm + ' 没有挂载末端') return r
+        const listed = svc.list()
+        if (!(listed.arms || []).includes(arm)) return { ok: false, error: '非法机械臂: ' + arm }
+        const hadMount = (listed.mounted || []).some((m) => m.arm === arm)
+        let unloaded = null
+        if (hadMount) {
+          const r = await svc.unmount(arm)
+          if (!r.ok) return r
+          unloaded = r
+        }
         const ph = await svc.bridge('set_tool', [arm, 'none'])
         const home = await svc.bridge('home', [arm])
         return {
           ok: true, arm: arm,
-          output: r.ok ? ('已卸载 ' + r.cap + '@' + r.version + ', 末端复位, 回原位') : '该臂无挂载, 末端复位, 回原位',
+          output: unloaded !== null ? ('已卸载 ' + unloaded.cap + '@' + unloaded.version + ', 末端复位, 回原位') : '该臂无挂载, 末端复位, 回原位',
           physical: { ok: ph.ok === true, output: JSON.stringify(ph) },
           home: { ok: home.ok === true, output: JSON.stringify(home) },
         }

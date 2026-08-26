@@ -138,7 +138,8 @@ export function apply(ctx) {
       const rec = (list.mounted || []).find((m) => m.arm === arm)
       if (rec === undefined) return JSON.stringify({ ready: false, reason: '挂载记录缺失' })
       const seen = await runCli('query_capabilities', [])
-      const tools = seen.ok && seen.parsed && seen.parsed.caps ? seen.parsed.caps.tools : undefined
+      if (!seen.ok) return JSON.stringify({ ready: false, reason: '状态回传不可用(' + seen.error + '), 请检查机器人侧' })
+      const tools = seen.parsed && seen.parsed.caps ? seen.parsed.caps.tools : undefined
       const physical = tools ? tools[arm] : undefined
       if (physical !== rec.cap) {
         return JSON.stringify({ ready: false, reason: '物理末端未装配或不匹配(' + (physical || 'none') + ' vs ' + rec.cap + ')' })

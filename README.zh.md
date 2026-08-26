@@ -35,7 +35,7 @@ ros-hotplug-by-dsh/
 ├── docs/                           # design(设计) / novelty(现状与亮点) / glossary(名词概念) / 时空组合性 / disclosure-log
 ├── src/                            # 源码工程(见 src/README.zh.md)
 │   ├── capabilities/               #   能力仓库(repo) + 挂载服务(mount_service) + 规范 + 挂载守卫
-│   ├── presets/robo/               #   机器人任务 agent preset(persona + observer + skills)
+│   ├── presets/robo/               #   机器人任务 agent preset(persona + observer + 臂管理器 + arm_status/take_object + skills)
 │   ├── ros2/                       #   sim_bridge(双臂仿真桥) + cpp_control(1kHz 控制)
 │   ├── bridge/                     #   桥接契约 + 薄 SDK
 │   └── sim/                        #   MuJoCo 模型与场景
@@ -59,6 +59,12 @@ ros-hotplug-by-dsh/
 - **桥接契约 + SDK**：tool_config / ball_position / touch_command / move_to（收敛完成式）/
   home_command / reset_command + /joint_state 回传（joints/tools/ball/ee）。
 - **评测**：pytest 门禁 + bridge 实时套件 + /tmp 隔离驱动套件（见 eval/tests/README.zh.md）。
+- **已知边界**：挂载记录为进程内存态，DSH 侧重启后需在面板重新挂载；面板写入口无鉴权，定位为单用户可信环境（见 design §7.11/§12）。
+
+## 验证环境
+
+- DSH: Cordis `4.0.1`、`@deepseek-ai/dsh-scope` `0.1.0-rc.7`（核心机制依赖其作用域/生命周期 API；rc 阶段上游不承诺兼容，升级后按运行时 `cordis_inspect` 复核）。
+- ROS2 Humble + rosbridge_server；MuJoCo/roslibpy/numpy 装在项目 venv `/root/venvs/robo`。
 
 ---
 

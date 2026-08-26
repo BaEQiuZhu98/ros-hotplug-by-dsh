@@ -34,7 +34,7 @@ repo/grasp/1.0.0/
 export const name = 'capability-grasp'
 export const inject = ['tools', 'capabilityMount']
 export function apply(ctx, config = {}) {
-  // config 由臂管理器注入(workdir/python 等)
+  // config 由挂载服务注入(workdir/python/arm 等)
   const unregister = ctx.tools.register({
     name: 'manipulate',   // 每臂一个同名实例, 靠臂作用域隔离(§7.2)
     description: '该臂当前末端的操控实例(内部策略).',

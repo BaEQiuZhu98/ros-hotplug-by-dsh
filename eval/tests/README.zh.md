@@ -60,7 +60,9 @@ bash eval/hotplug/assemble-env.sh stop
 驱动插件可选(每个各需一次独立装配运行):
 - `drivers/suite_core.js`: T-S 全系列 + T-M-02~09/16/24 + T-A-20/21/22;
 - `drivers/suite_fault.js`: T-A-15/16/19/26(杀 daemon / STOP 僵死 / sim 停止 / rosbridge 断线);
+- `drivers/suite_vision.js`: 视觉感知热插拔套件(T-S-16/17、T-A-29~32、T-M-27);
 - `drivers/suite_fake.js`: T-A-17 与 T-A-24③(需加 `--fake-python eval/hotplug/fixtures/fake-python.sh`);
+- `drivers/recon.js` / `drivers/spike_a.js`: 环境侦察与阶段 A 探针(历史证据);
 - `drivers/smoke.js`: 最小冒烟(会话→挂载→arm_status→take_object).
 
 ## 5. 结果聚合

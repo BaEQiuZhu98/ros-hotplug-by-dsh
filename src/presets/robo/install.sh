@@ -10,7 +10,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DSH_HOME="${1:-${DSH_HOME:-$HOME/.dsh}}"
-PROFILE="${2:-headless}"
+PROFILE="${2:-web}"
 DEST="$DSH_HOME/.agent-presets/robo"
 ARM_PKG_DIR="$DSH_HOME/profiles/$PROFILE/node_modules/@ros-hotplug/dsh-plugin-arm-manager"
 

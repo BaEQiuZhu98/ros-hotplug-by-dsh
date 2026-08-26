@@ -83,9 +83,23 @@ In a cordis session, pass `web_hotplug_panel.js`'s host half as `code.host` and 
 
 ## How it relates to the final goal
 
-- This is the **implementation** of the project's novelty claim: `DSH spatiotemporal compositionality × capability hot-plugging × reproducible demo`.
-- In interviews, "runtime end-effector swap + zero-trust check + swap rollback" is the hard differentiator.
+- This demo is the **teaching/demonstration form** of the project's novelty claim (dynamic plugins: `cordis_define`/`cordis_run`/`cordis_stop`, process-local, gone on restart), demonstrating the 7 reliability points and the mechanism intuition of capability hot-plugging.
+- The **production implementation form** lives in `src/` (capability repo dirs + mount service + arm/perception scopes + web panel): the same semantics — admission checks, runtime mount/unmount, multi-version swap, failure rollback — are landed as resident (out-of-tree) plugins in the mount system.
+- Mechanism mapping between the two forms:
+
+| Mechanism | demo/13 (demo form) | src/ (implementation form) |
+|---|---|---|
+| Capability form | dynamic plugin host half (in-process) | capability repo dir `repo/<cap>/<version>/{host.js, manifest.json}` |
+| Mount/unmount | `cordis_run` / `cordis_stop` | web panel → mount service → arm/perception contexts `ctx.plugin`/`fiber.dispose` |
+| Version swap/rollback | package versions + run pointers | version dirs + mount handles (auto-restore the old instance on failure) |
+| Admission check | `mount_guard.py` manual hash comparison | mount-service inline sha256 + kind routing |
+
+- In interviews, "runtime end-effector swap + zero-trust check + swap rollback" is backed by the `src/` mount system plus this demo's walkthrough.
 
 ## Appendix: reload after restart
 
 The capability tools and the web panel are dynamic plugins (process-local), so they disappear after `dsh web` restarts; re-mount with the `cordis_define` + `cordis_run` steps above (sources are saved in this directory).
+
+## Environment notes (hard-coded paths)
+
+This demo is a teaching walkthrough; its code hard-codes machine-specific paths (`/root/my-project/ros-hotplug-by-dsh`, `/root/venvs/robo/bin/python3`). On another machine, rebuild the same paths per the demo/06 environment steps, or replace them manually. The production implementation centralizes paths in `src/setup.sh` (the mount service's `env()` is the single path source).

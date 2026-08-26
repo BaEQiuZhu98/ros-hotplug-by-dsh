@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bridge_client.py - 桥接薄 SDK(阶段 0 固化, 由 demo/12 的 bridge_client.py 升级而来).
+bridge_client.py - 桥接薄 SDK(能力实例与普通 Python 脚本共用的唯一桥接入口).
 
 职责: 能力开发者(DSH 插件 host)与普通 Python 脚本共用的唯一桥接入口.
 把 rosbridge 的 WebSocket 细节全部隐藏, 校验内置, 任何方法失败都返回 {ok, error}.
@@ -10,6 +10,7 @@ bridge_client.py - 桥接薄 SDK(阶段 0 固化, 由 demo/12 的 bridge_client.
     set_tool(arm, tool)         切末端执行器(arm ∈ {A,B}; tool ∈ {grasp,suction,none})
     set_ball(x, y)              设置小球位置(有限数字)
     home(arm)                   该臂关节回原位(伸直, 不动末端与小球)
+    reset()                     全部复位(关节归零/末端卸下/小球回初始)
     touch(arm)                  选臂触碰小球
     move_to(arm, x, y, timeout) 收敛完成式移动到指定 XY(契约 v1.2, 返回 {ok, ee, ball})
     query_capabilities(wait)    读 /joint_state 回传, 返回当前能力集

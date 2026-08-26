@@ -10,8 +10,9 @@
 #   1. 把能力挂载服务行写入 $DSH_HOME/profiles/<profile>/cordis.patch.yml(幂等):
 #      repo/workdir/python 全部取本机实际路径 —— 这是全项目唯一的路径来源,
 #      面板与臂管理器都从挂载服务的 env() 读取, 不再各自硬编码.
-#   2. 安装 robo preset 与臂管理器包(调 src/presets/robo/install.sh).
-#   3. 打印后续步骤(重启 web / 建会话 / 起机器人侧).
+#   2. 把能力面板包复制进 profile node_modules 并写入面板行(id: cap-mount-panel).
+#   3. 安装 robo preset 与臂管理器包(调 src/presets/robo/install.sh).
+#   4. 打印后续步骤(重启 web / 建会话 / 起机器人侧).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"

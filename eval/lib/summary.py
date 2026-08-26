@@ -32,16 +32,27 @@ def load_run(run_dir):
     return cases
 
 
+def run_mtime(run_dir):
+    # 最新一轮的判据 = run 目录的修改时间(目录名字典序不可靠: run-driver > run-2026...).
+    try:
+        return run_dir.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def main():
     cases = []
+    run_mtimes = {}
     for run_dir in sorted(ROOT.glob('run-*')):
         if run_dir.is_dir():
+            run_mtimes[run_dir.name] = run_mtime(run_dir)
             cases.extend(load_run(run_dir))
     # 同一 case_id 取最新一轮 run 的判定(避免历史误报永久留在汇总).
     latest = {}
     for c in cases:
         key = c.get('case_id', c.get('_file', '?'))
-        if key not in latest or c.get('_run', '') >= latest[key].get('_run', ''):
+        run = c.get('_run', '')
+        if key not in latest or run_mtimes.get(run, 0.0) > run_mtimes.get(latest[key].get('_run', ''), 0.0):
             latest[key] = c
     cases = list(latest.values())
     by_verdict = {}

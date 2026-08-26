@@ -82,4 +82,4 @@ In a cordis session:
 
 - Plugin sources are saved in this directory: `dsh_move_arm_tool.js` (move_arm tool, host-only) and `web_arm_panel.js` (web panel, host + client halves).
 - Both are **dynamic plugins** (process-local), so they disappear after `dsh web` restarts; reload them with the `cordis_define` + `cordis_run` steps in section 4.
-- Note: when `move_arm` / the web panel runs the bridge script from the host, it must explicitly use demo 06's venv Python (`/root/venvs/robo/bin/python3`), because the system `python3` has no `roslibpy`.
+- Note: when `move_arm` / the web panel runs the bridge script from the host, it must explicitly use demo 06's venv Python (`/root/venvs/robo/bin/python3` (hard-coded in the plugin sources; rebuild the demo/06 environment or replace manually on another machine)), because the system `python3` has no `roslibpy`.

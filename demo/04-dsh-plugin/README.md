@@ -44,7 +44,7 @@ Tell the agent, pasting the `return { ... }` body from [`hello-tool.js`](hello-t
 
 The agent auto-loads the `cordis-plugin-development` skill, then:
 
-1. `cordis_define` — registers the package (name + purpose + host-half code); **nothing runs yet**; returns a `dyn-<n>` id; a "definition card" with a launch control appears in the session.
+1. `cordis_define` — registers the package (name + purpose + host-half code); **nothing runs yet**; returns a `pluginId`/`packageId`; a "definition card" with a launch control appears in the session.
 2. `cordis_run` — actually evaluates the host half, registering `hello` into the tools registry; from the next model step, the agent can call it.
 
 > Note: you don't type `cordis_define` arguments by hand — it's the agent's tool. Its exact schema is looked up by the agent via `cordis_inspect_list`, and the skill keeps usage correct. Also, `hello` needs only the host half; the client half is for plugins that want to put UI in the browser — leave it empty here.

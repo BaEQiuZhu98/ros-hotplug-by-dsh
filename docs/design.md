@@ -68,13 +68,13 @@ Existing solutions manage either "process/node" (ROS2 lifecycle/composable), "co
 
 ## 7. System design
 
-> The interfaces of the mechanisms in this section follow the runtime `cordis_inspect` queries.
+> The interfaces of the mechanisms in this section follow the runtime `cordis_inspect` queries. Verified environment: Cordis `4.0.1`, `@deepseek-ai/dsh-scope` `0.1.0-rc.7` (pre-release upstream makes no compatibility promise; re-check the runtime interfaces after upstream upgrades).
 
 ### 7.1 Scope hierarchy
 
 ```
 layer 0  global (machine)        host-composition mounts, inherited by every agent
-   ├─ sim_bridge (ROS2 process)     visualization echo (kinematic truth): arms/joints/end-effectors/ball state
+   ├─ sim_bridge (ROS2 process)     visualization echo (forward-kinematics state, not contact judgment): arms/joints/end-effectors/ball state
    ├─ capability mount service      admission checks + arm/slot context bookkeeping + instance registry; registers no agent tools
    ├─ web panel (host + client)     the only write path (mount/unmount end-effectors & sensors, set ball, reset arms)
    └─ tools registry (host service) the layer container for tool registrations
@@ -154,19 +154,19 @@ dynamically (extending physical arms additionally requires model + contract chan
 
 **After creating a robo session (agent initialization)**: persona/observer/arm_status/take_object are ready; the arm manager builds two **empty** arm scopes plus the perception slot for the session (mount points in place, no instances; sessions that missed the events or were resumed lazily rebuild on first arm_status/take_object execution). "grab the ball" now truthfully reports "no end-effector, cannot grab".
 
-### 7.8 Mounting an end-effector (example: arm A gets grasp@1.0.0)
+### 7.8 Mounting an end-effector (example: arm A gets grasp@1.2.0)
 
 | # | Who | Does what |
 |---|---|---|
-| 1 | human (panel client) | selects "grasp 1.0.0" in the arm A dropdown → host.call arm_mount{arm:A, cap:grasp, version:1.0.0} |
-| 2 | panel host | validates args → forwards mount(cap, version, {arm}) to the capability mount service |
+| 1 | human (panel client) | selects "grasp 1.2.0" in the arm A dropdown → host.call arm_mount{arm:A, cap:grasp, version:1.2.0} |
+| 2 | panel host | forwards mount(cap, version, {arm}) to the capability mount service (arm/slot validity is checked by the mount service) |
 | 3 | mount service | **admission**: read repo dir → sha256 vs manifest (mismatch → reject, stop) |
 | 4 | mount service | **dedup/replace rules**: arm A already has cap@version → reject (same-arm dedup); has another tool → unmount first (replace); empty → allow |
 | 5 | mount service | dynamic-import host.js (the strategy-bearing plugin module), ready to mount on the arm contexts |
 | 6 | mount service | ctx.plugin(plugin) on **every registered armA context** (one per session) → apply registers the `manipulate` instance (same name, armA layer); fiber.await confirms activation; failure → dispose & reject |
-| 7 | mount service | record {armA: grasp@1.0.0, handle}; tools/change broadcast (observer updates the capability report); contexts registered later auto-get the current end-effector |
+| 7 | mount service | record {armA: grasp@1.2.0, handle}; tools/change broadcast (observer updates the capability report); contexts registered later auto-get the current end-effector |
 | 8 | panel host | mount ok → physical assembly set_tool(A, grasp) (sim_bridge turns arm A's tip red; physical failure only warns, never rolls back a successful registration) |
-| 9 | panel client | refresh: the arm A dropdown shows grasp@1.0.0 |
+| 9 | panel client | refresh: the arm A dropdown shows grasp@1.2.0 |
 | 10 | agent | next arm_status(A) = {ready: true}; take_object(A) runs the grasp strategy |
 
 Unmount is symmetric: panel selects "no assembly" → mount service looks up the arm handle → fiber.dispose on every armA context (instance removed, armB unaffected) → panel set_tool(A, none) (tip resets) → refresh.
@@ -193,6 +193,7 @@ Precondition: arm A has grasp (grasp strategy), arm B has suction (suction strat
 - Mounted but physically mismatched: instance errors at step 6 → agent reports truthfully.
 - Same command after a swap: once the panel swaps A to suction, the same "have arm A take the ball" → arm_status(A) still ready → take_object(A) → the instance is now the suction strategy → the agent unknowingly switches strategy.
 - Vision hot-plug (sensor class): mounting camera_detect on the perception slot injects the ball position on the execution chain — "blind miss" becomes "precise hit"; unmounting the vision removes the interceptor with its fiber and falls back to blind grab; on vision failure the chain fails open and the grab flow continues.
+- **Execution-chain injection only works with grasp 1.2.0**: 1.0.0/1.1.0 and suction never emit the waterfall execution-chain event, so with vision mounted the interceptor silently does nothing — the legacy versions and suction run `touch` (sim_bridge IK-moves to the ball's live position; publish-and-return, no hit check) and are version-swap demo versions; precise grab and hit checks are 1.2.0 semantics.
 
 ### 7.10 Hot-plugging mechanism
 
@@ -202,7 +203,7 @@ Precondition: arm A has grasp (grasp strategy), arm B has suction (suction strat
 | Unmount end-effector | `fiber.dispose()` on every arm context (async, exact cleanup) | precisely reclaims its subscriptions/connections; the other arm is unaffected |
 | Replace end-effector | unmount old instance + mount new (repo version dirs coexist) | agent-unaware; the same take_object automatically switches strategy |
 | Same-name isolation | arm scopes: same-name manipulate instances coexist, each with its own lifecycle | two end-effector instances never cross-talk |
-| Failure rollback | swap unmounts the old instance first (a brief window), then auto-restores it on failure (best effort, explicit alert if restore fails) | injected bad version → old end-effector restored and usable |
+| Failure rollback | swap unmounts the old instance first (a brief window), then auto-restores it on failure; multi-session partial restore returns restored:'partial' with per-session alerts | injected bad version → old end-effector restored and usable |
 | Change perception | event broadcast (tools/change) + agent subscription | the agent automatically perceives add/remove |
 | Session adaptation | new/resumed sessions rebuild their contexts lazily; the mount service mounts the current capability onto the new context | every session's arm context always carries the current end-effector |
 
@@ -217,6 +218,7 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 - The capability mount service and the arm manager are **composition-mounted real plugins**, not dynamic-sandbox plugins: the dynamic sandbox ctx hides framework internals such as `ctx.plugin`/`fiber`, which mounting/unmounting needs.
 - Mounting and unmounting are asynchronous: after `ctx.plugin` returns the apply has not finished; after `dispose` returns cleanup has not finished. Mount waits for `fiber.await()`; unmount awaits dispose completion.
 - The agent has no mount/unmount tools = scope-level isolation, not persona persuasion.
+- **Trust boundary (stated honestly)**: the panel's `/cap-mount` routes have no authentication — any request able to reach the web service can write mounts. This project targets a single-user trusted environment (local loopback + one operator) and does not constitute a multi-user security boundary. Add authentication before opening the write path to multi-user or remote deployment.
 
 ### 7.12 One complete interaction (the demo's target behavior)
 
@@ -236,13 +238,13 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 
 | Engineering practice | This project's counterpart | Verification |
 |---|---|---|
-| Zero-trust pipeline | verify manifest/hash before mounting an end-effector; reject invalid | tampered manifest → rejected |
-| Active/standby + multi-version | one end-effector capability, multiple coexisting versions (repo version dirs) | same-arm version swap, per-arm different versions, no conflict |
-| Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware | task unaffected during the switch |
-| Auto rollback on failure | a failed swap auto-restores the old instance (best effort, explicit alert on restore failure) | inject fault → old end-effector restored |
+| Integrity hash verification | verify manifest/hash before mounting an end-effector; reject invalid | tampered manifest → rejected |
+| Multi-version coexistence | one end-effector capability, multiple coexisting versions (repo version dirs) | same-arm version swap, per-arm different versions, no conflict |
+| Version swap | unmount old instance + mount new instance, agent-unaware | the same API auto-switches strategy |
+| Auto rollback on failure | a failed swap auto-restores the old instance | inject fault → old end-effector restored |
 | Pub/sub event notification | end-effector add/remove broadcasts events; agent subscribes | event received on mount/unmount |
 | Hardware-difference shielding | the agent only perceives `ready`; grasp/suction strategies stay inside instances | same API auto-switches strategy after an end-effector swap |
-| High availability / no leaks | arm-scope isolation + dispose for exact cleanup | no residue after unmount |
+| Exact resource reclamation | arm-scope isolation + dispose for exact cleanup | no residue after unmount |
 
 ### 8.1 Mechanism & landing per point
 
@@ -286,6 +288,7 @@ Three reasons for MuJoCo: ① the main line is motion control (MuJoCo's strength
 ```
 ros-hotplug-by-dsh/
 ├── src/
+│   ├── setup.sh                    #    one-shot install (path centralization: mount row / panel pkg / robo preset)
 │   ├── capabilities/              # ★ capability repo + mount service + spec
 │   │   ├── capability-spec.md     #    capability dev spec (template + manifest + mount flow)
 │   │   ├── mount_service/         #    capability mount service (host-resident: sha256 admission + kind routing + arm/slot context bookkeeping + resident bridge daemon)
@@ -295,6 +298,7 @@ ros-hotplug-by-dsh/
 │   │   └── cap-mount-panel/        #    end-effector panel (dual-face: host /cap-mount route + client tsdown bundle)
 │   ├── presets/                   #    runtime carrier
 │   │   └── robo/                  #    agent.cordis.yml (persona + observer + arm manager + arm_status/take_object + skills)
+│   │       └── arm_manager/       #    out-of-tree arm-manager package (arm scopes / perception slot + tools)
 │   ├── ros2/                      #    robot side (colcon packages)
 │   │   ├── cpp_control/           #    C++ high-rate control node (1kHz, PID)
 │   │   └── sim_bridge/            #    Python simulation bridge (MuJoCo + rclpy)
@@ -306,6 +310,9 @@ ros-hotplug-by-dsh/
 │       └── scenes/                #    preset scenes
 ├── eval/                          # ★ evaluation
 │   ├── robot/  agent/  hotplug/
+│   ├── tests/                     #   pytest gates & live suites
+│   ├── lib/                       #   result aggregation (summary.py)
+│   └── results/                   #   run records (run-* dirs, not committed)
 ├── demo/                          #   teaching (00~13, the evidence chain)
 ├── docs/                          #   this design doc + highlights + mechanism + receipts
 └── plugins/                       #   dynamic plugin archive (workflow helpers)
@@ -328,7 +335,7 @@ ros-hotplug-by-dsh/
 - **First-class deliverable = the capability repo directory**: `repo/<capability>/<version>/{host.js, manifest.json}`. host.js is a zero-dependency ESM `{apply, inject, name}` plugin; manifest.json records metadata + host.js sha256.
 - **Capability = a strategy-bearing end-effector instance**: each capability is the complete unit of "end-effector hardware + driving strategy" (grasp = grasp strategy, suction = suction strategy). Its apply registers the same-name `manipulate` tool **on an arm scope**; execute implements the strategy (perceive physical match → run strategy steps → state verification) and **never changes assembly**.
 - **npm out-of-tree = optional distribution shell**: `pack.sh` turns a repo directory into a tarball; installing unpacks it into the repo and follows the same mount flow (install ≠ mount).
-- **Capability mount service (mount_service)**: host-resident plugin (composition-mounted, not a dynamic sandbox). Duties = **admission checks** (sha256 + kind routing: arm mount points accept end-effector only, the perception slot accepts sensor only + same-point dedup/replace) + **context bookkeeping** (per-session arm scopes and perception slots registered by the arm manager; newly registered contexts auto-mount the current capability; session teardown removes them symmetrically); the actual `ctx.plugin`/`fiber.dispose` runs on those contexts (scopes) (§7.1). Write path = web panel RPC; **registers no agent tools**.
+- **Capability mount service (mount_service)**: host-resident plugin (composition-mounted, not a dynamic sandbox). Duties = **admission checks** (sha256 + kind routing: arm mount points accept end-effector only, the perception slot accepts sensor only + same-point dedup/replace; failed-swap restore returns full true / partial 'partial' / failed false) + **context bookkeeping** (per-session arm scopes and perception slots registered by the arm manager; newly registered contexts auto-mount the current capability; session teardown removes them symmetrically); the actual `ctx.plugin`/`fiber.dispose` runs on those contexts (scopes) (§7.1). Write path = web panel RPC; **registers no agent tools**.
 - **API form**: DSH's standard Tool contract; hot-plugging is DSH's runtime mount mechanism (ctx.plugin/dispose), and the repo directory is the carrier being hot-plugged.
 
 ### 10.4 L2 runtime carrier (agent preset)
@@ -341,7 +348,7 @@ ros-hotplug-by-dsh/
 ### 10.5 L3 robot side (ROS2 packages)
 
 - **Packages**: `cpp_control` (C++/rclcpp), `sim_bridge` (Python/rclpy + MuJoCo).
-- **Function**: `cpp_control` = 1kHz control loop, PID, trajectory tracking, latency measurement; `sim_bridge` = subscribes bridge commands, drives MuJoCo, `--view` visualization, publishes state feedback (the two-arm scene runs `two_arm_server.py`).
+- **Function**: `cpp_control` = 1kHz scalar PID control loop + rate/jitter/compute-time measurement (integral uses the target period; no trajectory tracking or latency measurement); `sim_bridge` = subscribes bridge commands, drives MuJoCo, `--view` visualization, publishes state feedback (the two-arm scene runs `two_arm_server.py`).
 - **API form**: ROS2 message contract (see L4).
 - **Hand-written vs existing**: teaching/eval **hand-written** (learn principles, measure precisely); for a real robot, swap in `ros2_control`/`MoveIt2` per the contract, and the sim bridge can be replaced by `mujoco_ros2_control` (maintained by ros-controls). Hand-written and ready-made don't conflict — L3's interface is left replaceable, which is the adaptability point.
 
@@ -404,6 +411,8 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
 | Trajectory tracking | well-tuned position error <1mm order | engineering norm |
 | Repeatability (real robot, reference) | industrial ±0.01~0.1mm; Franka ±0.1mm | product specs |
 
+> **Honest comparison note**: what is actually measured today is the analytic IK timing of the 2-DOF teaching arm (`eval/robot/ik_timing.py`); same-magnitude comparison against the IK-solver baselines above (6-DOF general-purpose) is a reference only, not a like-for-like conclusion. Control rate / jitter / trajectory tracking / IK error / repeatability have no landed measurements yet (see `eval/results/SUMMARY.md` for the evaluation status).
+
 ### 11.3 Hot-plug acceptance
 
 | Metric | Acceptance |
@@ -424,6 +433,7 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
 ## 12. Limitations & future
 
 - Only the software capability layer; hardware (electrical/connection), hard real-time, safety boundaries out of scope.
+- **Mount records are process memory (boundary, stated)**: after a DSH-side restart the mount records are gone while sim_bridge keeps the physical tools — re-mount in the panel after restart (arm contexts of new/resumed sessions rebuild lazily and get the current capability mounted); `reset_all` with the bridge down unmounts logically while the physical side may keep residual state — a known boundary of the unimplemented logic-vs-physics reconciliation.
 - **Link latency (stated as measured)**: perception-execution goes through rosbridge; after the SDK is made resident,
   one SDK call costs about 100 ms (measured locally: query_capabilities avg 100 ms, dominated by the 10 Hz
   state-feedback interval; publish-only calls avg 101 ms, dominated by the send flush) — monitoring/task-grade

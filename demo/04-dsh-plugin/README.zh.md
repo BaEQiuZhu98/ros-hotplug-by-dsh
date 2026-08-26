@@ -44,7 +44,7 @@
 
 agent 会自动加载 `cordis-plugin-development` skill, 然后:
 
-1. `cordis_define` —— 登记这个包(名字 + 用途 + host 半代码), **此时不运行任何东西**, 返回一个 `dyn-<n>` 标识; 会话里会出现一张"定义卡片", 带启动控件.
+1. `cordis_define` —— 登记这个包(名字 + 用途 + host 半代码), **此时不运行任何东西**, 返回 `pluginId`/`packageId` 标识; 会话里会出现一张"定义卡片", 带启动控件.
 2. `cordis_run` —— 真正求值 host 半, 把 `hello` 工具注册进 tools 注册表; 从下一个模型步起, agent 就能调用它.
 
 > 说明: 你不用手敲 `cordis_define` 的参数, 这是 agent 的工具. 它的确切 schema 由 agent 经 `cordis_inspect_list` 现查, 并由 skill 保证用法正确. 另外 hello 只需要 host 半; client 半是给"要往浏览器里放 UI"的插件用的, 这里留空.

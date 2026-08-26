@@ -82,4 +82,4 @@ python3 move_ee.py 0.5 0.3
 
 - 插件源码已随本目录保存：`dsh_move_arm_tool.js`（move_arm 工具，host-only）、`web_arm_panel.js`（web 面板，host + client 两半部）。
 - 这两个是**动态插件**（进程内临时），重启 `dsh web` 后会消失；用上面第 4 步的 `cordis_define` + `cordis_run` 重新加载即可。
-- 注意：`move_arm` / web 面板在 host 里跑桥接脚本时，要显式用 demo 06 那个 venv 的 Python（`/root/venvs/robo/bin/python3`），因为系统 `python3` 没装 `roslibpy`。
+- 注意：`move_arm` / web 面板在 host 里跑桥接脚本时，要显式用 demo 06 那个 venv 的 Python（`/root/venvs/robo/bin/python3`），因为系统 `python3` 没装 `roslibpy`；插件代码内写死的 `/root/venvs/robo/bin/python3` 与仓库路径换机器时需按 demo/06 环境重建或手动替换。

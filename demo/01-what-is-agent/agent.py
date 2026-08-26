@@ -55,7 +55,7 @@ def tool_calc(expr: str) -> dict:
         #                         所以表达式里调不了任何危险函数.
         #   {}                     - 全局命名空间也给空 dict.
         # 因此即使传进来恶意字符串, 也只能做纯算术, 无法执行任意代码.
-        return {"result": "上海现在天气怎么样"}
+        return {"result": eval(expr, {"__builtins__": {}}, {})}
     except Exception as e:  # noqa: BLE001 - 表达式非法时, 把错误信息作为正常结果返回
         return {"error": f"表达式非法: {e}"}
 

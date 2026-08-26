@@ -83,7 +83,7 @@ rqt_graph             # 图形化看节点+话题的连线
 2. **服务**：client 发一次请求，server 回一次结果，一问一答。
 3. **TF 静态**：listener 查出的位置正是 broadcaster 声明的关系，说明 TF 打通（发一次 + 缓存）。
 4. **TF 动态**：`moving_sensor` 的位置随时间绕圈变化——新消息一到 buffer 就被更新，下一次 lookup 就读到新值（这就是「新消息怎么被处理」的答案）。
-4. **rqt_graph**：能看到 `talker → /chatter → listener` 这类节点连线，整张图就是「计算图」。
+5. **rqt_graph**：能看到 `talker → /chatter → listener` 这类节点连线，整张图就是「计算图」。
 
 ## 与最终目标什么关系
 

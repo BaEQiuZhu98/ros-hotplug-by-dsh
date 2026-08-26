@@ -55,6 +55,12 @@ ros-hotplug-by-dsh/
 - **robo agent preset**: the agent only perceives `ready` and executes `take_object`, never end-effector implementation details; mounting the vision capability injects the ball position into the execution chain (blind grab → precise), unmounting falls back automatically, and vision failures fail open.
 - **Bridge contract + SDK**: tool_config / ball_position / touch_command / move_to (convergence-completing) / home_command / reset_command + /joint_state feedback (joints/tools/ball/ee).
 - **Evaluation**: pytest gates + bridge live suite + /tmp isolated driver suites (see eval/tests/README.zh.md).
+- **Known boundaries**: mount records are process memory — re-mount in the panel after a DSH-side restart; the panel write path is unauthenticated, targeting a single-user trusted environment (see design §7.11/§12).
+
+## Verified environment
+
+- DSH: Cordis `4.0.1`, `@deepseek-ai/dsh-scope` `0.1.0-rc.7` (the core mechanisms rely on their scope/lifecycle APIs; pre-release upstream makes no compatibility promise — re-check against the runtime `cordis_inspect` after upgrades).
+- ROS2 Humble + rosbridge_server; MuJoCo/roslibpy/numpy live in the project venv `/root/venvs/robo`.
 
 ---
 

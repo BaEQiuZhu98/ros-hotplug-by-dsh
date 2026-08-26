@@ -9,9 +9,11 @@ sim_bridge - 双臂仿真桥(阶段 0 固化, 由 demo/13 two_arm_server.py 升�
   /tool_config(String)    - 载荷 "ARM:TOOL", 切换臂的末端执行器(grasp/suction/none).
   /ball_position(String)  - 载荷 "x,y", 设置小球 XY 位置(z 固定 0.5).
   /touch_command(String)  - 载荷 "A"|"B", 让该臂末端去触碰小球.
+  /move_to(String)        - 载荷 "ARM:x,y", 该臂末端收敛移动到指定 XY.
   /home_command(String)   - 载荷 "A"|"B", 该臂关节回原位(伸直, 不动末端与小球).
+  /reset_command(String)  - 载荷 "reset", 全部复位(关节归零/末端卸下/小球回初始).
 发布:
-  /joint_state(String)    - 载荷 JSON(10 Hz), 格式见 bridge/contract.md v1.0.
+  /joint_state(String)    - 载荷 JSON(10 Hz), 格式见 bridge/contract.md v1.2.
 
 为什么把模型 XML 挪到文件: 模型属于仿真资源(src/sim/models/), 与代码解耦,
 改模型不改代码; 真机迁移时只换本节点, 话题契约不变.
@@ -36,8 +38,22 @@ from std_msgs.msg import String
 
 # 默认模型路径: 源码树 src/sim/models/two_arm_scene.xml.
 # 本文件位于 <repo>/src/ros2/sim_bridge/sim_bridge/ 下, 上溯 3 级即 <repo>/src.
+# 安装态(colcon)源码树不可用时, 回退到随包分发的 share/sim_bridge/models/.
 _SRC_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MODEL = _SRC_ROOT / 'sim' / 'models' / 'two_arm_scene.xml'
+
+
+def _installed_model_fallback():
+    if DEFAULT_MODEL.exists():
+        return DEFAULT_MODEL
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        shared = Path(get_package_share_directory('sim_bridge')) / 'models' / 'two_arm_scene.xml'
+        if shared.exists():
+            return shared
+    except Exception:
+        pass
+    return DEFAULT_MODEL
 
 A1 = 0.4  # 连杆 1 长度(m)
 A2 = 0.4  # 连杆 2 长度(m)
@@ -124,7 +140,7 @@ class TwoArmServer(Node):
         self.get_logger().info('two_arm_server 已就绪')
 
     def on_reset(self, msg):
-        # 全部复位(契约 v1.1): 关节目标归零(平滑回伸直), 末端全部卸下(灰), 小球回初始位置.
+        # 全部复位(契约 v1.2): 关节目标归零(平滑回伸直), 末端全部卸下(灰), 小球回初始位置.
         self.targets = {'A': np.array([0.0, 0.0]), 'B': np.array([0.0, 0.0])}
         for arm in ARMS:
             self.tools[arm] = 'none'
@@ -161,8 +177,8 @@ class TwoArmServer(Node):
         # 超出工作空间的范围做钳制并告警, 避免污染 mocap 导致仿真发散.
         try:
             parts = msg.data.split(',')
-            x = float(parts[0])
-            y = float(parts[1])
+            x = float(parts[0].strip())
+            y = float(parts[1].strip())
         except Exception:
             self.get_logger().warn('非法小球位置: %s' % msg.data)
             return
@@ -189,8 +205,8 @@ class TwoArmServer(Node):
         try:
             head, tail = msg.data.split(':')
             arm = head.strip()
-            x = float(tail.split(',')[0])
-            y = float(tail.split(',')[1])
+            x = float(tail.split(',')[0].strip())
+            y = float(tail.split(',')[1].strip())
         except Exception:
             self.get_logger().warn('非法移动指令: %s' % msg.data)
             return
@@ -239,25 +255,22 @@ class TwoArmServer(Node):
 
     def publish_joint_state(self):
         # 回传格式见 bridge/contract.md v1.2: JSON 字符串, 含版本号 v=1 与末端位置 ee(workspace 系).
+        joints = {}
+        ee = {}
+        for arm in ARMS:
+            q1 = float(self.data.qpos[self.jq[arm][0]])
+            q2 = float(self.data.qpos[self.jq[arm][1]])
+            joints[arm] = [q1, q2]
+            # ee 用 FK 正解(workspace 系, 臂基座偏移 + 正解), 与 ball 同系(命中判定直接相减).
+            tip = fk_absolute(q1, q2, ARMS[arm]['base'])
+            ee[arm] = [float(tip[0]), float(tip[1])]
         state = {
             'v': 1,
-            'joints': {
-                'A': [float(self.data.qpos[a]) for a in self.jq['A']],
-                'B': [float(self.data.qpos[a]) for a in self.jq['B']],
-            },
+            'joints': joints,
             'tools': dict(self.tools),
             'ball': [float(self.ball[0]), float(self.ball[1])],
-            'ee': {
-                'A': [float(self.data.qpos[a]) for a in self.jq['A']],
-                'B': [float(self.data.qpos[a]) for a in self.jq['B']],
-            },
+            'ee': ee,
         }
-        # ee 用 FK 正解(workspace 系, 臂基座偏移 + 正解), 覆盖上面的关节角占位.
-        for arm in ARMS:
-            q1 = self.data.qpos[self.jq[arm][0]]
-            q2 = self.data.qpos[self.jq[arm][1]]
-            ee = fk_absolute(q1, q2, ARMS[arm]['base'])
-            state['ee'][arm] = [float(ee[0]), float(ee[1])]
         msg = String()
         msg.data = json.dumps(state)
         self.state_pub.publish(msg)
@@ -293,8 +306,8 @@ def run_view(node):
 def main(args=None):
     parser = argparse.ArgumentParser(description='sim_bridge: 双臂 MuJoCo 仿真桥')
     parser.add_argument('--view', action='store_true', help='弹 MuJoCo 窗口可视化')
-    parser.add_argument('--model', default=str(DEFAULT_MODEL),
-                        help='MJCF 模型文件路径(默认 src/sim/models/two_arm_scene.xml)')
+    parser.add_argument('--model', default=str(_installed_model_fallback()),
+                        help='MJCF 模型文件路径(默认源码树 src/sim/models/, 安装态回退 share/sim_bridge/models/)')
     args, _ = parser.parse_known_args()
 
     if not Path(args.model).exists():

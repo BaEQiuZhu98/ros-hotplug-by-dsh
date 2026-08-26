@@ -317,7 +317,7 @@ export function apply(ctx, config = {}) {
     return unregisterArms
   }
 
-  // 感知槽(场景扩展): slot -> [ctx...]  smer 类能力挂载点(标签 = agent key, 每会话一套).
+  // 感知槽(场景扩展): slot -> [ctx...]  sensor 类能力挂载点(标签 = agent key, 每会话一套).
   const slotContexts = new Map()
   // slot -> {cap, version, fibers, plugin}  槽位当前挂载.
   const slotsBySlot = new Map()
@@ -459,14 +459,26 @@ export function apply(ctx, config = {}) {
         }
         if (cur !== undefined) {
           const restored = []
+          const failed = []
           for (const targetCtx of contexts) {
             const rr = await mountOnContext(targetCtx, cur.plugin, slot)
             if (rr.ok) restored.push({ dispose: rr.dispose, ctx: targetCtx })
+            else failed.push(rr.error || '未知错误')
           }
-          if (restored.length > 0) {
+          // 恢复语义三态(多会话部分恢复不得冒充全量成功): 全量 -> true; 部分 -> 'partial';
+          // 全失败 -> false. 部分恢复时逐会话告警, 返回值与日志都如实.
+          if (restored.length === contexts.length) {
             slotsBySlot.set(slot, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
             console.warn('[cap-mount-service] 槽 %s 换挂 %s@%s 失败, 已自动恢复旧能力 %s@%s', slot, cap, version, cur.cap, cur.version)
             return { ok: false, error: r.error, restored: true }
+          }
+          if (restored.length > 0) {
+            slotsBySlot.set(slot, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
+            for (const reason of failed) {
+              console.warn('[cap-mount-service] 槽 %s 部分恢复: 一个会话上下文恢复失败(%s)', slot, reason)
+            }
+            console.error('[cap-mount-service] 槽 %s 换挂 %s@%s 失败, 旧能力 %s@%s 仅部分恢复(%d/%d 会话)', slot, cap, version, cur.cap, cur.version, restored.length, contexts.length)
+            return { ok: false, error: r.error + '(旧能力部分恢复: ' + restored.length + '/' + contexts.length + ' 会话)', restored: 'partial' }
           }
           console.error('[cap-mount-service] 槽 %s 换挂失败且旧能力 %s@%s 恢复失败', slot, cur.cap, cur.version)
           return { ok: false, error: r.error + '(且旧能力恢复失败)', restored: false }
@@ -527,17 +539,28 @@ export function apply(ctx, config = {}) {
           }
         }
         // 恢复旧实例(尽力而为): 换挂存在短暂窗口期(先摘旧再挂新), 失败后自动恢复旧末端;
-        // 恢复成功/失败都显式告警并在返回值中标明(与文档「失败回滚」语义一致).
+        // 恢复语义三态(多会话部分恢复不得冒充全量成功): 全量 -> true; 部分 -> 'partial'
+        // (逐会话告警); 全失败 -> false.
         if (cur !== undefined) {
           const restored = []
+          const failed = []
           for (const targetCtx of contexts) {
             const rr = await mountOnContext(targetCtx, cur.plugin, arm)
             if (rr.ok) restored.push({ dispose: rr.dispose, ctx: targetCtx })
+            else failed.push(rr.error || '未知错误')
           }
-          if (restored.length > 0) {
+          if (restored.length === contexts.length) {
             armsByArm.set(arm, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
             console.warn('[cap-mount-service] 臂 %s 换挂 %s@%s 失败, 已自动恢复旧末端 %s@%s', arm, cap, version, cur.cap, cur.version)
             return { ok: false, error: r.error, restored: true }
+          }
+          if (restored.length > 0) {
+            armsByArm.set(arm, { cap: cur.cap, version: cur.version, fibers: restored, plugin: cur.plugin })
+            for (const reason of failed) {
+              console.warn('[cap-mount-service] 臂 %s 部分恢复: 一个会话上下文恢复失败(%s)', arm, reason)
+            }
+            console.error('[cap-mount-service] 臂 %s 换挂 %s@%s 失败, 旧末端 %s@%s 仅部分恢复(%d/%d 会话)', arm, cap, version, cur.cap, cur.version, restored.length, contexts.length)
+            return { ok: false, error: r.error + '(旧末端部分恢复: ' + restored.length + '/' + contexts.length + ' 会话)', restored: 'partial' }
           }
           console.error('[cap-mount-service] 臂 %s 换挂失败且旧末端 %s@%s 恢复失败, 旧末端已丢失', arm, cur.cap, cur.version)
           return { ok: false, error: r.error + '(且旧末端恢复失败)', restored: false }

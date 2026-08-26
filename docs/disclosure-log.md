@@ -36,6 +36,10 @@
 > Offline verification (anyone can re-check):
 > `openssl ts -verify -data DESIGN.zh.md -in docs/timestamps/DESIGN.zh.md.tsr -CAfile docs/timestamps/freetsa-cacert.pem`
 
+> **The stamped files were later renamed/merged**: `DESIGN.zh.md` is now `design.zh.md` (merged into the design doc), and `novelty-claim.zh.md` is now `novelty.zh.md` (merged into the status-quo & highlights doc); both have been refreshed since, so their current hashes no longer match the receipts. This does not weaken the time anchor (hash receipts + first-commit hash + push time jointly support priority). To re-check, take the git historical versions at stamping time, e.g.:
+> `git show <first-commit hash>:DESIGN.zh.md > /tmp/DESIGN.zh.md`,
+> then run the openssl verification above against /tmp/DESIGN.zh.md; `novelty-claim.zh.md` likewise.
+
 ---
 
 ## 3. Public dissemination

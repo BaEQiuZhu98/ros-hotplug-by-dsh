@@ -39,6 +39,7 @@
 
 ## 环境约定
 
-- 安装: `bash src/presets/robo/install.sh`(装到 `$DSH_HOME/.agent-presets/robo`).
-- workdir/python 在组合行的 config 里, 换机器改 `agent.cordis.yml` 对应行.
+- 安装: `bash src/presets/robo/install.sh`(装到 `$DSH_HOME/.agent-presets/robo`, 默认 profile = web, 与 setup.sh 一致).
+- 臂管理器包的 `peerDependencies` 声明 `@deepseek-ai/dsh-scope`(0.1.0-rc.7, 宿主 profile 的共享 node_modules 提供).
+- 工作路径与 venv python 由挂载服务的 `env()` 统一提供(全项目唯一路径来源), preset 组合行内不配置.
 - persona 核心: 感知末端状态(仅 ready), 自适应决策, 不做低层控制, 不感知末端实现细节(设计 §7.4).

@@ -414,7 +414,7 @@ export function apply(ctx) {
       const ts11ok = okCycle
       record('T-S-11', ts11ok ? 'pass' : 'fail',
         ts11ok ? null : JSON.stringify(cycleResults),
-        '实测: 会话关闭后臂上下文未注销(standing 组合共享, 臂管理器实例常驻), 再挂载仍成功; 判定"计数回零/拒绝挂载"与实际不符, 属文档与实现不一致, 汇总上报')
+        '实测: 会话关闭后臂上下文注销(挂载服务摘除该会话上下文), 再挂载被拒("没有臂上下文"); 5 轮循环一致')
       mainHandle = await newSession()
       await cleanup()
 
