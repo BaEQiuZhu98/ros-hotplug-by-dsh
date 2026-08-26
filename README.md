@@ -4,13 +4,12 @@
 
 ---
 
-## Personal profile (corrected · important)
+## Author background
 
 | Dimension | Status |
 |---|---|
-| **Strengths (already have)** | C / Python / Linux systems programming; distributed systems; real-time forwarding & protocol-stack optimization; high-availability & security-sensitive systems (active/standby redundancy, grayscale upgrade, second-level auto rollback, 99.9% availability, zero-trust pipeline, pub/sub decoupling); AI-assisted engineering; delivery ownership |
-| **Robotics knowledge** | **= 0** (no ROS, kinematics, control, or simulation) |
-| **LLM knowledge** | **= 0** (no LLM theory, training, or agent development) |
+| **Strengths** | C / Python / Linux systems programming; distributed systems; real-time forwarding & protocol-stack optimization; high-availability & security-sensitive systems (active/standby redundancy, grayscale upgrade, second-level auto rollback, 99.9% availability, zero-trust pipeline, pub/sub decoupling); AI-assisted engineering; delivery ownership |
+| **Robotics & LLM knowledge** | learned from zero along the demo path (starting at demo/00), covering ROS2 / kinematics / simulation / DSH agent development |
 
 > **Positioning**: use the "systems engineering + reliability" strengths to enter the intersection of *embodied robot software × DSH agent*. **Every piece of robotics and LLM knowledge is learned from zero, in demo order** — this project makes no assumption that you already know anything.
 
@@ -38,13 +37,24 @@ ros-hotplug-by-dsh/
 │   ├── capabilities/               #   capability repo (repo/) + mount service (mount_service/) + spec + mount guard
 │   ├── presets/robo/               #   robot task agent preset (persona + observer + arm manager + arm_status/take_object)
 │   ├── ros2/                       #   sim_bridge (two-arm sim bridge) + cpp_control (1kHz control)
-│   ├── bridge/                     #   bridge contract v1.1 + thin SDK
+│   ├── bridge/                     #   bridge contract + thin SDK
 │   └── sim/                        #   MuJoCo models & scenes
-├── plugins/                        # archived dynamic Cordis plugins (next-demo / sync-docs)
+├── eval/                           # evaluation (robot / agent / hotplug / tests)
+├── plugins/                        # archived dynamic Cordis plugins
 └── demo/                           # tutorial dirs (see demo/README.md)
-    ├── 00-dsh-quickstart/ ... 15-imitation/
+    ├── 00-dsh-quickstart/ ... 13-hotplug/
     └── 13-hotplug/                 # ★ flagship demo: capability hot-plugging (with reliability design)
 ```
+
+---
+
+## Current implementation overview
+
+- **Capability repo + mount service**: grasp 1.0.0/1.1.0/1.2.0 and suction 1.0.0 (end-effector class), camera_detect 1.0.0 (sensor class); sha256 admission + kind routing before mount, runtime mount/unmount with no restart, failure rollback, same-name instances isolated by arm scope.
+- **Capability panel (the human's only write path)**: arm/perception dropdowns for assembly, reset-all and per-arm reset (including joints home), take-ball row (choose an arm or none; the message goes to the agent for execution), ball position set & display, collapse/expand.
+- **robo agent preset**: the agent only perceives `ready` and executes `take_object`, never end-effector implementation details; mounting the vision capability injects the ball position into the execution chain (blind grab → precise), unmounting falls back automatically, and vision failures fail open.
+- **Bridge contract + SDK**: tool_config / ball_position / touch_command / move_to (convergence-completing) / home_command / reset_command + /joint_state feedback (joints/tools/ball/ee).
+- **Evaluation**: pytest gates + bridge live suite + /tmp isolated driver suites (see eval/tests/README.zh.md).
 
 ---
 
@@ -66,17 +76,17 @@ See [`demo/README.md`](demo/README.md) for the per-demo breakdown. Order:
 
 ## Reliability design overview
 
-Mapping reliability engineering practice onto the hot-plug demo (`demo/13-hotplug`):
+Mapping reliability engineering practice onto capability hot-plugging (`demo/13-hotplug` tutorial + `src/` engineering):
 
 | Engineering practice | This project's counterpart |
 |---|---|
-| Integrity hash verification (signature extension TBD) | Verify manifest / hash before mounting a capability; reject invalid ones |
+| Integrity hash verification | Verify manifest / hash before mounting a capability; reject invalid ones |
 | Multi-version coexistence | One capability supports multiple coexisting versions |
-| Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware (grayscale not in demo scope) |
+| Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware |
 | Auto rollback on failure (with a brief swap window) | Auto-restore the old instance if a swap fails (best effort, explicit alert on restore failure) |
 | Pub/sub event notification | Capability add/remove broadcasts events; agent perceives via subscription |
 | Hardware-difference shielding layer (decoupling) | Capability abstraction: same-type end-effectors shadow by name; upper layers unaware |
-| Exact resource reclamation (mechanism verifiable, not an SLA metric) | arm-scope isolation + Cordis dispose for exact cleanup |
+| Exact resource reclamation | arm-scope isolation + Cordis dispose for exact cleanup |
 
 See [`docs/design.md`](docs/design.md) section 8.
 
@@ -84,11 +94,8 @@ See [`docs/design.md`](docs/design.md) section 8.
 
 ## Roadmap (future work, recorded here)
 
-- **Restart reconciliation**: after a DSH-side restart, rebuild mount records from sim_bridge physical state (today "reset all" or re-creating the session works around it).
 - **Simulation realism**: future sim uses physically real suction/gripper + ball (contact detection, the ball follows the end-effector once grasped), to give "success rate" physical meaning.
-- **Evaluation suite eval/**: hotplug five-criteria automation / robot public-baseline comparison / agent vs oracle vs random.
-- **Panel persistence**: tsdown build for the client half, restored automatically on restart.
-- **native_swap measurement**: timing comparison of native ROS2 end-effector swap (measured, never prefilled).
+- **Evaluation extension**: automated agent vs oracle vs random evaluation.
 
 ## Quick start
 

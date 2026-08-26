@@ -57,5 +57,5 @@ ros2 run demo11_cpp_control control_node
 ## 与最终目标什么关系
 
 - 这是**机器人软件开发岗最硬的门槛**：会写、会编译、会测 C++ 控制循环，是招聘里最看重的硬技能。
-- demo 12 的 DSH↔ROS2 桥、demo 13 的热插拔，最终的控制节点都会用 C++（rclcpp），Python 只做仿真桥/编排。
+- 这个 C++ 控制循环被固化为 `cpp_control` colcon 包（位于 `src/ros2/cpp_control`）用于控制频率基准；MuJoCo 仿真桥仍用 Python。
 - 你的 C/Linux/实时转发经验，正好和这一章的「高频控制 + 延迟测量」直接对得上——这是简历上的差异化亮点。

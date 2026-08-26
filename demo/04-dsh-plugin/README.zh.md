@@ -66,13 +66,13 @@ agent 会自动加载 `cordis-plugin-development` skill, 然后:
 > 1. **动态包只存在当前 DSH 进程内存里**: 不写文件、不改 `cordis.yml`、不跨重启存续, `stop`/`undefine`/重启后即消失. 想留下成果, 走路径 B 或正式开发流程.
 > 2. **信任立场 = shell 访问**: cordis 工具集能改运行中的 runtime, 使用时要像授予 bash 一样慎重.
 
-### 路径 B: 树外包(正式交付, demo/13 会用到)
+### 路径 B: 树外包(正式交付)
 
 ```bash
 dsh plugin --profile web add <你的插件包名>
 ```
 
-然后在组合文件里加一行插件行(见 demo/03 的"能力=插件行"). 这是"创建一个真正的 plugin"的简历级方式, 留到 demo/13 完整做.
+然后在组合文件里加一行插件行(见 demo/03 的"能力=插件行"). 这是"创建一个真正的 plugin"的简历级方式.
 
 ## 观察什么
 
@@ -82,5 +82,5 @@ dsh plugin --profile web add <你的插件包名>
 
 ## 与最终目标什么关系
 
-- demo/13 的 `dsh-plugin-robo` 就是把这个模式用在**机器人能力**上: 每个运动原语(抓取/移动/放置)都是一个这样的工具.
-- 而"热插拔" = 运行时**挂载/卸载**这些工具(见 demo/05 的时空组合性).
+- 项目的机器人能力就是这个模式的落地: `src/capabilities/repo` 里的每个能力(grasp/suction/camera_detect)都注册一个工具(`manipulate`/`detect_ball`), 由能力挂载服务在运行时挂到臂/感知作用域上.
+- 而"热插拔" = 运行时**挂载/卸载**这些工具实例(见 demo/05 的时空组合性).

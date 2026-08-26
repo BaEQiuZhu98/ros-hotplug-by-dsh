@@ -32,7 +32,6 @@ skill 的发现根是「项目根」. 项目根 = 最近的 `.git` 祖先目录,
 mkdir -p .dsh/skills/project-conventions
 cp demo/02-ai-coding/sample-skill/SKILL.md .dsh/skills/project-conventions/SKILL.md
 ```
-Project-code-writing-specification
 > skill 发现根(优先级从高到低, 见 DSH `dsh-skill-filesystem` 文档):
 > `<projectRoot>/.dsh/skills` → `<projectRoot>/.agents/skills` → 自定义 → `~/.dsh/skills` → `~/.agents/skills`
 

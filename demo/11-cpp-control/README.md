@@ -57,5 +57,5 @@ Both nodes print the **same format**, so compare the three numbers directly:
 ## How it relates to the final goal
 
 - This is the **hardest gate for robotics software roles**: being able to write, build, and benchmark a C++ control loop is the most-valued hard skill.
-- demo 12's DSH↔ROS2 bridge and demo 13's hot-plugging will use C++ (rclcpp) for the actual control nodes; Python stays for the simulation bridge / orchestration.
+- The same C++ control loop is frozen as the `cpp_control` colcon package (under `src/ros2/cpp_control`) for control-rate benchmarking; the MuJoCo sim bridge stays in Python.
 - Your C/Linux/real-time forwarding experience maps directly onto this chapter's "high-rate control + latency measurement" — a clear resume differentiator.

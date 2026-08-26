@@ -1,6 +1,6 @@
 # eval/agent/task-set.md - T-E-01 任务集与成功判定口径(定义性用例产物)
 
-> 依据 .dsh/test-plan.md v3 T-E-01: 产物 = eval/agent 的任务集与口径文档.
+> T-E-01 的产物 = eval/agent 的任务集与口径文档.
 > 本文件只定义口径, 不含任何数值(数值实测后写入, 禁止预填).
 
 ## 1. 任务集

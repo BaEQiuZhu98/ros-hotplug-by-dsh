@@ -24,10 +24,10 @@ python3 mount_guard.py grasp capabilities/grasp_tool.js   # 拒绝: 哈希不匹
 - `cordis_define`（grasp v2）→ `pkg-B`（append，不覆盖 v1）
 - **证明**：v1/v2 两个 package 同时存在，`currentPackageId` 指向 v1，`next` 指向 v2，可随时切换。
 
-## #3 灰度升级 / 零中断（`update` 切版）
+## #3 换版切换 / 零中断（`update` 切版）
 
 ```text
-cordis_run(grasp, pkg-B, mode="update")   # 从 v1 灰度切到 v2
+cordis_run(grasp, pkg-B, mode="update")   # 从 v1 切到 v2
 ```
 - **证明**：工具名仍是 `grasp`，agent 继续调 `grasp()` 不感知版本变化；切换瞬间旧 run 停、新 run 起。
 
@@ -73,7 +73,7 @@ cordis_run(grasp, pkg-B, mode="update")   # 从 v1 灰度切到 v2
 **#2 多版本共存**
 - 追加 grasp v2：`grasp-5/pkg-9`（`cordis_inspect_self` 显示 `packageCount: 3`，v1/v2/v3 并存不覆盖）
 
-**#3 灰度升级**
+**#3 换版切换**
 - `cordis_run(grasp-5, pkg-9, mode="update")` → `grasp-5/pkg-9 is running (run-9)`
 
 **#4 秒级回滚**

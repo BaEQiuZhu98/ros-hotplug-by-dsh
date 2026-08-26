@@ -4,15 +4,14 @@
 
 ---
 
-## 个人画像（修正版 · 重要）
+## 作者背景
 
 | 维度 | 现状 |
 |---|---|
-| **强项（已具备）** | C / Python / Linux 底层；分布式系统；实时转发与协议栈优化；高可用与安全敏感系统（主备冗余、灰度升级、异常秒级回滚、99.9% 可用性、零信任安全流水线、发布/订阅解耦）；AI 辅助研发工程化；项目交付 |
-| **机器人知识** | **= 0**（无 ROS、无运动学、无控制、无仿真经验） |
-| **大模型知识** | **= 0**（无 LLM 原理、无训练、无 agent 开发经验） |
+| **强项** | C / Python / Linux 底层；分布式系统；实时转发与协议栈优化；高可用与安全敏感系统（主备冗余、灰度升级、异常秒级回滚、99.9% 可用性、零信任安全流水线、发布/订阅解耦）；AI 辅助研发工程化；项目交付 |
+| **机器人与大模型知识** | 沿 demo 教学路线（demo/00 起）从零学起，覆盖 ROS2 / 运动学 / 仿真 / DSH agent 开发 |
 
-> **定位**：用「系统工程 + 可靠性」的强项切入「具身机器人软件 × DSH agent」这个交叉点。**所有机器人与大模型知识，一律在 demo 中按顺序从零学起**，本项目不做任何「默认你已经会」的假设。
+> **定位**：用「系统工程 + 可靠性」的强项切入「具身机器人软件 × DSH agent」这个交叉点。所有机器人与大模型知识，一律在 demo 中按顺序从零学起，本项目不做任何「默认你已经会」的假设。
 
 ---
 
@@ -28,23 +27,38 @@
 
 ---
 
-## 仓库结构（当前阶段：demo 证据链 + src 源码工程；eval 待建）
+## 仓库结构
 
 ```
 ros-hotplug-by-dsh/
 ├── README.zh.md / README.md        # 本文件（中 / 英）
 ├── docs/                           # design(设计) / novelty(现状与亮点) / glossary(名词概念) / 时空组合性 / disclosure-log
-├── src/                            # 源码工程(阶段 0~2 已落地, 见 src/README.zh.md)
+├── src/                            # 源码工程(见 src/README.zh.md)
 │   ├── capabilities/               #   能力仓库(repo) + 挂载服务(mount_service) + 规范 + 挂载守卫
 │   ├── presets/robo/               #   机器人任务 agent preset(persona + observer + skills)
 │   ├── ros2/                       #   sim_bridge(双臂仿真桥) + cpp_control(1kHz 控制)
-│   ├── bridge/                     #   桥接契约 v1.0 + 薄 SDK
+│   ├── bridge/                     #   桥接契约 + 薄 SDK
 │   └── sim/                        #   MuJoCo 模型与场景
-├── plugins/                        # 动态 Cordis 插件归档（next-demo / sync-docs）
+├── eval/                           # 评测(robot / agent / hotplug / tests)
+├── plugins/                        # 动态 Cordis 插件归档
 └── demo/                           # 教学目录（见 demo/README.zh.md）
-    ├── 00-dsh-quickstart/ ... 15-imitation/
+    ├── 00-dsh-quickstart/ ... 13-hotplug/
     └── 13-hotplug/                 # ★ 旗舰 demo：机器人能力热插拔（含可靠性设计）
 ```
+
+---
+
+## 当前实现概览
+
+- **能力仓库 + 挂载服务**：grasp 1.0.0/1.1.0/1.2.0、suction 1.0.0（末端类）与 camera_detect 1.0.0（传感器类）；
+  挂载前 sha256 准入 + kind 路由，运行时挂/卸不重启，失败回滚，同名实例按臂作用域隔离。
+- **能力面板（人的唯一写入口）**：臂/感知下拉框装配、全部复位与单臂复位（含关节回原位）、
+  拿小球行（选臂或不指定臂，发给 agent 执行）、小球位置设定与显示、折叠展开。
+- **robo agent preset**：agent 只感知 ready 与执行 take_object，不感知末端实现细节；
+  视觉能力挂载后执行链自动注入小球位置（盲抓 → 精准），卸载自动回退，视觉异常 fail-open。
+- **桥接契约 + SDK**：tool_config / ball_position / touch_command / move_to（收敛完成式）/
+  home_command / reset_command + /joint_state 回传（joints/tools/ball/ee）。
+- **评测**：pytest 门禁 + bridge 实时套件 + /tmp 隔离驱动套件（见 eval/tests/README.zh.md）。
 
 ---
 
@@ -70,13 +84,13 @@ ros-hotplug-by-dsh/
 
 | 工程实践 | 本项目落点 |
 |---|---|
-| 完整性哈希校验（签名扩展待做） | 能力挂载前 manifest / 哈希校验，不合法拒绝挂载 |
+| 完整性哈希校验 | 能力挂载前 manifest / 哈希校验，不合法拒绝挂载 |
 | 多版本共存 | 同一能力多版本并存（能力仓库版本目录） |
-| 升级切换 + 业务零中断 | 卸载旧实例 + 挂载新实例，agent 无感（灰度切流不演示） |
+| 升级切换 + 业务零中断 | 卸载旧实例 + 挂载新实例，agent 无感 |
 | 失败自动回滚（存在短暂切换窗口） | 换挂失败自动恢复旧实例（尽力，恢复失败显式告警） |
 | 发布/订阅事件通知 | 能力增删广播事件，agent 通过订阅感知 |
 | 硬件差异屏蔽层（解耦） | 能力抽象层：同型末端执行器同名遮蔽、上层无感 |
-| 资源精确回收（机制可验证，非 SLA 指标） | 臂作用域隔离 + Cordis dispose 精确回收 |
+| 资源精确回收 | 臂作用域隔离 + Cordis dispose 精确回收 |
 
 详见 [`docs/design.zh.md`](docs/design.zh.md) 第 8 节。
 
@@ -84,11 +98,8 @@ ros-hotplug-by-dsh/
 
 ## 路线图（未来会做，记录于此）
 
-- **重启对账**：DSH 侧重启后，按 sim_bridge 物理状态重建挂载关系（当前可用「全部复位」或重建会话兜底）。
 - **仿真真实性**：后续仿真采用真实物理形态的吸盘 + 夹爪 + 小球（接触判定、抓取后球随末端运动），支撑评测的「成功率」语义。
-- **评测套件 eval/**：hotplug 五指标自动化 / robot 公开基线对照 / agent vs oracle vs random。
-- **面板持久化**：client 半部 tsdown 构建，重启自动恢复。
-- **native_swap 实测**：ROS2 原生换末端耗时对比（实测，不预填）。
+- **评测扩展**：agent vs oracle vs random 自动化评测。
 
 ## 快速开始
 

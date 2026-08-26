@@ -15,7 +15,7 @@
   插入即见、拔出即回收, 全程不重启.
 - **准入检查(配置表, 不是作用域)**: 每次挂载前挂载守卫(mount_guard, 实现在
   `mount_service/host.js` 的 `loadPlugin()`)对 host.js 重算 SHA256 与 manifest 比对,
-  再经挂载服务的规则表(该臂允许的末端类型 / 同臂防重 / 替换规则).
+  再经挂载服务的 kind 路由(臂只收 end-effector、感知槽只收 sensor / 同点防重 / 替换规则).
 
 ## 2. 能力目录模板(以 grasp 为例)
 
@@ -55,7 +55,7 @@ export function apply(ctx, config = {}) {
   这是挂载体系的约定依赖).
 - 副作用全部随插件 dispose 回收(apply 返回 disposer).
 
-### 3.1 能力间协作: waterfall 执行链(契约 v1.2 起)
+### 3.1 能力间协作: waterfall 执行链
 
 - **作用域化发射必须经挂载服务助手**: 能力实例是零依赖(禁 import 任何包), 而跨作用域的事件织入需要 dsh-scope 的载体——一律调用 `ctx.capabilityMount.scopedWaterfall(armCtx, 'manipulate_execute', [req], 终端函数)`, 不得直接 `ctx.waterfall`(非作用域发射会跨会话拦截泄漏).
 - **req 契约**:
@@ -67,7 +67,7 @@ export function apply(ctx, config = {}) {
   - 只许「原地修改 req 字段 + 调用 next()」; 不改字段也应 next();
   - 不 next() 且返回非 undefined = **带原因否决**(该值上抛为执行结果);
   - **fail-open 是视觉类拦截器的默认策略**: 感知数据不可用时放行(目标为空 → 执行原语的盲分支)+ 日志告警, 不否决、不抛错;
-  - 多拦截器顺序 = 注册序(可 `{prepend: true}` 插队); v1 不引入 manifest `order` 字段;
+  - 多拦截器顺序 = 注册序(可 `{prepend: true}` 插队);
   - 单一职责: 数据注入方只注入数据不改编排, 编排(优先目标位置否则预设点)永远在执行原语内部.
 - **命中判定在执行原语内**: move_to(收敛完成式)返回 `{ok, ee, ball}`(workspace 系), 距离阈值 0.05m; 「sim 算、能力只判」, 输出文案供测试断言.
 
@@ -87,25 +87,28 @@ export function apply(ctx, config = {}) {
 ```
 
 - `sha256` 必须真实计算: `sha256sum host.js`.
-- `kind` ∈ {`end-effector`, `sensor`, `skill`}, **缺省视为 `end-effector`**(既有能力不破坏). 挂载服务按 kind 路由挂载点: end-effector → 臂作用域; sensor → 感知槽(agent 层).
+- `kind` ∈ {`end-effector`, `sensor`, `skill`}, **缺省视为 `end-effector`**. 挂载服务按 kind 路由挂载点: end-effector → 臂作用域; sensor → 感知槽(agent 层).
 - 挂载前校验: 挂载服务 mount 的第一步 = sha256 与 manifest 比对, 不通过直接拒绝; 准入顺序 = sha256 → kind 校验(槽位类型匹配, 不匹配拒绝并说明) → 规则表 → 落位.
 
 ## 5. 挂载体系(准入 + 臂作用域)
 
 - **能力挂载服务(mount_service)**: host 常驻插件(组合挂载, 非动态沙箱——动态沙箱 ctx 隐藏
   `ctx.plugin`/`fiber` 等框架内部). 职责:
-  - 准入检查: sha256 + 规则表(该臂允许的末端类型 / 同臂防重 / 替换);
-  - 臂管理: 按臂记录 {arm, cap, version}; 动态 import 能力插件后在臂上下文上落位;
+  - 准入检查: sha256 + kind 路由(臂只收 end-effector、感知槽只收 sensor / 同点防重 / 替换);
+  - 上下文管理: 按臂/槽记录当前挂载 {cap, version}; 动态 import 能力插件后在对应上下文上落位;
+    新注册的会话上下文自动补挂当前能力, 会话注销时对称摘除;
   - 不注册任何 agent 工具.
-- **臂管理器(robo preset 内, 会话级)**: 会话创建时在 agent 上下文下预建 armA/armB 两个空作用域
-  (`createScope(agentCtx, 'armA'/'armB')`)并 registerArms 注册到挂载服务; 挂载 = 挂载服务在目标
+- **臂管理器(robo preset 内, 会话级)**: 为每个会话建立 armA/armB 两条臂作用域与感知槽
+  (`createScope(agentCtx, armKey, { parent: 会话 agent 作用域 })`)并 registerArms 注册到挂载服务;
+  错过事件/恢复的会话在首次执行 arm_status/take_object 时懒补建; 挂载 = 挂载服务在目标
   臂上下文上 `ctx.plugin`(注册 manipulate 实例), 卸载 = 该臂上下文 `fiber.dispose()`(只回收本臂实例).
 
 ```text
-mount(cap, version, {arm})  准入检查 -> 动态 import -> 挂载服务在 armX 上下文 ctx.plugin
-                            -> 同臂防重: 臂 X 已挂同 cap@version 拒绝; 已挂别的先卸载(替换)
-unmount(arm)                臂作用域 dispose(该能力实例注销; 不影响另一臂)
-list()                      {repo, mounted: [{arm, cap, version}]}
+mount(cap, version, {arm})  准入检查 -> 动态 import -> 在全部已注册的该臂上下文 ctx.plugin
+                             -> 同臂防重: 臂 X 已挂同 cap@version 拒绝; 已挂别的先卸载(替换)
+mount(cap, version, {slot})  感知槽路径(只收 sensor 类), 同构准入与挂载
+unmount(arm)                 该臂各上下文 dispose(该能力实例注销; 不影响另一臂)
+list()                       {repo, mounted: [{arm, cap, version}], slots, arms}
 ```
 
 - **臂间独立**: 不同臂可挂同名能力(A/B 各挂 grasp), 同名 manipulate 实例按作用域隔离, 互不串台.
@@ -117,7 +120,6 @@ list()                      {repo, mounted: [{arm, cap, version}]}
 - 版本 = 能力目录名(语义化版本目录 `1.0.0`/`1.1.0`).
 - 换版: 面板选新版本 → 该臂卸载旧实例 + 挂载新实例, agent 的 arm_status/take_object 语义不变.
 - 回滚: 换挂失败(挂载返回 error, restored 字段标明恢复结果)→ 自动恢复旧实例(尽力); 也可显式换回旧版本.
-- 灰度切流不演示; 秒级回滚是句柄模型的原生能力.
 
 ## 7. 分发流程(npm 发布外壳, 可选)
 

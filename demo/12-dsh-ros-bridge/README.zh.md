@@ -75,7 +75,7 @@ python3 move_ee.py 0.5 0.3
 
 ## 与最终目标什么关系
 
-- 这是 demo 13 旗舰「热插拔」的地基：demo 13 会在这条「DSH ↔ ROS2」桥上运行时增删「能力工具」（grasp/suction/detect…），每个能力最终都经这条桥驱动 ROS2。
+- 这是 demo 13 旗舰「热插拔」的地基：demo 13 在运行时增删「能力工具」（grasp/suction/detect…），每个能力最终都经类似这条桥驱动 ROS2。
 - 「agent/web 前端经 rosbridge 调 ROS2」正是简历里「打通 DSH 与机器人」的硬证据。
 
 ## 附：插件代码与重启后重新加载

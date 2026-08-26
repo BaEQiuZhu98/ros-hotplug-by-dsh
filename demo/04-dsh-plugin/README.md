@@ -66,13 +66,13 @@ Say "greet me". On success, you see it call `hello({name: ...})` and return `hel
 > 1. **A dynamic package exists only in the current DSH process memory**: it writes no files, changes no `cordis.yml`, does not survive a restart, and disappears on `stop`/`undefine`/restart. To keep the result, use Path B or the normal dev flow.
 > 2. **Trust posture = shell access**: the cordis toolset can mutate the live runtime; treat it as carefully as granting bash.
 
-### Path B: out-of-tree package (real delivery, used in demo/13)
+### Path B: out-of-tree package (real delivery)
 
 ```bash
 dsh plugin --profile web add <your-package>
 ```
 
-Then add a plugin row in the composition (see demo/03's "capability = plugin row"). This is the resume-grade way to "create a real plugin" — done fully in demo/13.
+Then add a plugin row in the composition (see demo/03's "capability = plugin row"). This is the resume-grade way to "create a real plugin".
 
 ## What to observe
 
@@ -82,5 +82,5 @@ Then add a plugin row in the composition (see demo/03's "capability = plugin row
 
 ## How it relates to the final goal
 
-- demo/13's `dsh-plugin-robo` applies this exact pattern to **robot capabilities**: each motion primitive (grasp/move/place) is such a tool.
-- "Hot-plugging" = mounting/unmounting those tools at runtime (see demo/05's spatiotemporal compositionality).
+- The project's robot capabilities apply this exact pattern: each capability in `src/capabilities/repo` (grasp/suction/camera_detect) registers a tool (`manipulate`/`detect_ball`), mounted into arm/perception scopes at runtime by the capability mount service.
+- "Hot-plugging" = mounting/unmounting those tool instances at runtime (see demo/05's spatiotemporal compositionality).

@@ -17,7 +17,7 @@ Using DSH's spatiotemporal compositionality as the composition primitive for rob
 
 - **Problem**: embodied robots need runtime add/remove/replace of capabilities (swap end-effector, add sensor, upgrade skill); existing solutions either require restarts, only manage hardware/component layers, or are decoupled from the LLM agent decision layer.
 - **Method**: use DSH spatiotemporal compositionality (layered scopes + Cordis lifecycle + version timeline) as the **capability orchestration layer** on top of ROS2; each robot capability becomes a DSH plugin tool; hot-plugging = scope registration/deregistration.
-- **Result**: implement and verify four indicators — **mount-and-see, unmount-and-reclaim, same-name isolation, agent-unaware** — plus reliability design (verification, multi-version, grayscale, rollback, event notification).
+- **Result**: implement and verify five indicators — **mount-and-see, unmount-and-reclaim, same-name isolation, agent-unaware switch, failure rollback** — plus reliability design (verification, multi-version, event notification).
 
 ## 3. Motivation & background
 
@@ -35,9 +35,9 @@ Using DSH's spatiotemporal compositionality as the composition primitive for rob
 
 | Component | Content |
 |---|---|
-| **Mechanism** | DSH layered scopes + parent-chain inheritance + nearest-wins + `isolate` realm + Cordis `dispose` + version timeline (plugin/package/run) |
+| **Mechanism** | DSH layered scopes (arm scopes / perception slot) + parent-chain inheritance + Cordis `dispose` + capability version dirs & mount handles (swap/rollback) |
 | **Scenario** | embodied-robot capability hot-plugging: end-effectors (gripper ↔ suction), sensors, skills |
-| **Implementation** | reproducible `demo/13-hotplug` (end-effector class) and `demo/14` (sensor class, vision hot-plug) (and the `src/` engineering), with reliability design and evaluation |
+| **Implementation** | reproducible `demo/13-hotplug` (end-effector class) and the `src/` engineering (including the sensor-class vision hot-plug), with reliability design and evaluation |
 
 ### 4.3 Explicitly not claimed
 
@@ -46,7 +46,7 @@ Inventing "spatiotemporal compositionality" (it is DSH's mechanism); "first robo
 ### 4.4 Verification & escalation path
 
 - Not seen in public sources: periodic searches recorded (keywords in `novelty.md`).
-- Reproducible: anyone can run `demo/13-hotplug` and reproduce the four indicators.
+- Reproducible: anyone can run `demo/13-hotplug` and reproduce the §11.3 hot-plug acceptance criteria.
 - Temporal priority: commit hash + timestamps + push in `disclosure-log.md`.
 - Wording escalation: internal statement (now) → public blog → arXiv (drop "first", experiments decide).
 
@@ -68,27 +68,28 @@ Existing solutions manage either "process/node" (ROS2 lifecycle/composable), "co
 
 ## 7. System design
 
-> The mechanisms in this section are verified on DSH 0.1.0-rc.7 (the installed package.json version); re-check interfaces against the runtime after upgrades.
+> The interfaces of the mechanisms in this section follow the runtime `cordis_inspect` queries.
 
 ### 7.1 Scope hierarchy
 
 ```
 layer 0  global (machine)        host-composition mounts, inherited by every agent
-   ├─ sim_bridge (ROS2 process)     visualization echo (kinematic truth): arms/joints/end-effectors/ball state (physical realism on the roadmap)
-   ├─ capability mount service      admission checks + arm bookkeeping + instance registry; registers no agent tools
-   ├─ web panel (host + client)     the only write path (mount/unmount end-effectors)
+   ├─ sim_bridge (ROS2 process)     visualization echo (kinematic truth): arms/joints/end-effectors/ball state
+   ├─ capability mount service      admission checks + arm/slot context bookkeeping + instance registry; registers no agent tools
+   ├─ web panel (host + client)     the only write path (mount/unmount end-effectors & sensors, set ball, reset arms)
    └─ tools registry (host service) the layer container for tool registrations
 
 layer 1  agent (task agent)      robo preset mount (per session)
    ├─ persona                  "perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"
-   ├─ arm manager               pre-creates armA, armB scopes and the perception slot in-session, registers the contexts, provides arm_status/take_object
+   ├─ arm manager               builds the arm scopes and the perception slot for every session, registers the
+   │                            contexts (event-driven + lazy rebuild on first tool execution), provides arm_status/take_object
    ├─ observer                  subscribes to tools/change, reports the capability set
    ├─ arm_status tool           perception entry: is this arm ready (has a usable end-effector)
    ├─ take_object tool          execution entry: have this arm take the object (strategy inside the instance)
    └─ perception slot (label = the agent key itself)   mounting point for sensor-class capabilities: detect_ball is visible to the agent;
                                                         its interceptor hits arm-layer events up the parent chain (vision feeds the execution chain)
 
-layer 2  arms armA / armB      createScope(armManagerCtx, armKey, { parent: session agent scope }), pre-created empty at session start
+layer 2  arms armA / armB      createScope(armManagerCtx, armKey, { parent: session agent scope }), one set per session
    └─ the arm's end-effector capability instance (mount/unmount happen on this layer; invisible to the agent — parents do not see children)
 
 layer 3  end-effector instance  strategy-bearing capability plugin (§10.3), mounted on an arm layer:
@@ -96,7 +97,7 @@ layer 3  end-effector instance  strategy-bearing capability plugin (§10.3), mou
    └─ armB mounts suction -> suction-strategy instance (registers same-name tool `manipulate`)
 ```
 
-The hot-plugged object is the **strategy-bearing capability instance** (end-effectors on arm layers, sensors on the perception slot), living and dying on its registered context; same-name instances are isolated by scope and never cross-talk. Events bubble up the parent chain (arm-layer execution-chain events hit the perception-slot interceptor via the agent layer), while tool/service visibility inherits down the parent chain — two opposite directions that together define the layering (baseline: `.dsh/vision-hotplug-scenario-design.md`).
+The hot-plugged object is the **strategy-bearing capability instance** (end-effectors on arm layers, sensors on the perception slot), living and dying on its registered context; same-name instances are isolated by scope and never cross-talk. Events bubble up the parent chain (arm-layer execution-chain events hit the perception-slot interceptor via the agent layer), while tool/service visibility inherits down the parent chain — two opposite directions that together define the layering.
 
 ### 7.2 Scopes & visibility
 
@@ -110,11 +111,11 @@ The hot-plugged object is the **strategy-bearing capability instance** (end-effe
 | Question | Answer |
 |---|---|
 | **May** this end-effector be mounted (integrity / provenance) | mount_guard: host.js sha256 vs manifest; mismatch → reject (implemented as inline sha256 in the mount service) |
-| What is this arm **allowed** to mount | rule table in the mount service: allowed end-effector types per arm + same-arm dedup/replace rules |
+| What is this arm **allowed** to mount | mount service kind routing: arm mount points accept end-effector-class capabilities only; same-arm dedup/replace rules |
 | What is mounted now | per-arm records {arm, cap, version, instance handle} |
 | **Where** it lands, when it lives/dies, who sees it | the scope (arm layer), not the rule table |
 
-The table only says allow/reject and never holds instances. Order: sha256 → rule table → landing (arm-scope registration).
+The table only says allow/reject and never holds instances. Order: sha256 → kind/dedup rules → landing (arm-scope registration).
 The single source of truth for the logical arm list is the mount service row's `config.arms` (default A/B);
 the panel, the arm manager's scope creation, and mount/unmount validation all follow `list().arms`
 dynamically (extending physical arms additionally requires model + contract changes).
@@ -134,7 +135,8 @@ dynamically (extending physical arms additionally requires model + contract chan
 | Tool | Semantics | Returns |
 |---|---|---|
 | `arm_status(arm)` | perception: is this arm ready | `{ready: true/false}`; false carries a reason (no end-effector / physical mismatch) |
-| `take_object(arm)` | execution: have this arm take the object | structured result (success/failure + reason) |
+| `take_object(arm)` | execution: have this arm take the object | structured result (hit/miss/failure + reason) |
+| `detect_ball()` | explicit perception (visible when a vision capability is mounted): query the ball position | `{ok, ball}` or a failure reason |
 
 - The agent's decision surface is a single `ready` boolean; its prompt carries no end-effector model knowledge. Adding an end-effector (screwdriver, welder) never changes the persona or the tool interface.
 - End-effector implementation details (grasp/suction strategies) live entirely inside the instances; observability and explanation come from observer logs and sim_bridge state feedback (not from the agent's output).
@@ -150,24 +152,24 @@ dynamically (extending physical arms additionally requires model + contract chan
 
 **After process startup (dsh web + rosbridge + sim_bridge)**: sim_bridge has both arms straight, end-effectors none (grey), ball at home; the mount service reads the capability repo inventory and the rule table, with nothing mounted; the panel renders the inventory and two empty arm rows.
 
-**After creating a robo session (agent initialization)**: persona/observer/arm_status/take_object are ready; the arm manager pre-creates two **empty** arm scopes (mount points in place, no instances). "grab the ball" now truthfully reports "no end-effector, cannot grab".
+**After creating a robo session (agent initialization)**: persona/observer/arm_status/take_object are ready; the arm manager builds two **empty** arm scopes plus the perception slot for the session (mount points in place, no instances; sessions that missed the events or were resumed lazily rebuild on first arm_status/take_object execution). "grab the ball" now truthfully reports "no end-effector, cannot grab".
 
 ### 7.8 Mounting an end-effector (example: arm A gets grasp@1.0.0)
 
 | # | Who | Does what |
 |---|---|---|
-| 1 | human (panel client) | clicks "arm A -> grasp@1.0.0" → host.call arm_mount{arm:A, cap:grasp, version:1.0.0} |
+| 1 | human (panel client) | selects "grasp 1.0.0" in the arm A dropdown → host.call arm_mount{arm:A, cap:grasp, version:1.0.0} |
 | 2 | panel host | validates args → forwards mount(cap, version, {arm}) to the capability mount service |
 | 3 | mount service | **admission**: read repo dir → sha256 vs manifest (mismatch → reject, stop) |
-| 4 | mount service | **rule table**: arm A already has cap@version → reject (same-arm dedup); has another tool → unmount first (replace); empty → allow |
+| 4 | mount service | **dedup/replace rules**: arm A already has cap@version → reject (same-arm dedup); has another tool → unmount first (replace); empty → allow |
 | 5 | mount service | dynamic-import host.js (the strategy-bearing plugin module), ready to mount on the arm contexts |
-| 6 | mount service | ctx.plugin(plugin) on the registered **armA context (scope)** → apply registers the `manipulate` instance (same name, armA layer); fiber.await confirms activation; failure → dispose & reject |
-| 7 | mount service | record {armA: grasp@1.0.0, handle}; tools/change broadcast (observer updates the capability report) |
+| 6 | mount service | ctx.plugin(plugin) on **every registered armA context** (one per session) → apply registers the `manipulate` instance (same name, armA layer); fiber.await confirms activation; failure → dispose & reject |
+| 7 | mount service | record {armA: grasp@1.0.0, handle}; tools/change broadcast (observer updates the capability report); contexts registered later auto-get the current end-effector |
 | 8 | panel host | mount ok → physical assembly set_tool(A, grasp) (sim_bridge turns arm A's tip red; physical failure only warns, never rolls back a successful registration) |
-| 9 | panel client | refresh: arm A row highlights grasp@1.0.0 |
+| 9 | panel client | refresh: the arm A dropdown shows grasp@1.0.0 |
 | 10 | agent | next arm_status(A) = {ready: true}; take_object(A) runs the grasp strategy |
 
-Unmount is symmetric: panel click → mount service looks up the arm handle → fiber.dispose on the armA context (instance removed, armB unaffected) → panel set_tool(A, none) (tip resets) → refresh.
+Unmount is symmetric: panel selects "no assembly" → mount service looks up the arm handle → fiber.dispose on every armA context (instance removed, armB unaffected) → panel set_tool(A, none) (tip resets) → refresh.
 
 ### 7.9 The grab-ball flow (example: "have arm A take the ball")
 
@@ -175,14 +177,14 @@ Precondition: arm A has grasp (grasp strategy), arm B has suction (suction strat
 
 | # | Who | Does what |
 |---|---|---|
-| 1 | human (panel client) | clicks "arm A -> take the ball" → inputActions sends the message "have arm A take the ball" (the panel neither judges nor executes) |
+| 1 | human (panel client) | take-ball row: select "arm A" → click "take the ball" → inputActions sends the message "have arm A take the ball" (the panel neither judges nor executes) |
 | 2 | agent | receives the command; persona drives: perceive first → arm_status(A) |
 | 3 | arm manager/observer | per-arm-scope query returns {ready: true} |
 | 4 | agent | decides: arm A ready → call take_object(arm: 'A') |
 | 5 | in-session dispatch | resolves the current `manipulate` instance on the armA scope → calls instance.execute() |
-| 6 | instance (grasp strategy) | perceives the physical end-effector (must match, else error; never changes assembly) → runs the grasp strategy (approach/grasp/verify) → SDK → rosbridge → sim_bridge |
-| 7 | sim_bridge | solves IK, arm A rotates to touch the ball, updates /joint_state feedback |
-| 8 | instance | state verification (feedback confirms the tip engaged) → structured result |
+| 6 | instance (grasp strategy) | perceives the physical end-effector (must match, else error; never changes assembly) → the waterfall execution chain manipulate_execute decides: vision mounted → interceptor injects the ball position (precise), no vision → the arm's blind-grab preset point (A=[0.3,-0.3], B=[0.3,0.3]) → SDK move_to (convergence-completing) |
+| 7 | sim_bridge | solves IK, arm A moves to the target, /joint_state feedback (with ee and ball) |
+| 8 | instance | move_to returns only when arrived; tip-ball distance < 0.05 m → "hit", else "miss"; structured result |
 | 9 | agent | reports truthfully (what it perceived / did / the result) |
 
 **Branches**:
@@ -190,17 +192,19 @@ Precondition: arm A has grasp (grasp strategy), arm B has suction (suction strat
 - Arm A bare: arm_status(A) = {ready: false} → agent reports "arm A has no end-effector, cannot take".
 - Mounted but physically mismatched: instance errors at step 6 → agent reports truthfully.
 - Same command after a swap: once the panel swaps A to suction, the same "have arm A take the ball" → arm_status(A) still ready → take_object(A) → the instance is now the suction strategy → the agent unknowingly switches strategy.
+- Vision hot-plug (sensor class): mounting camera_detect on the perception slot injects the ball position on the execution chain — "blind miss" becomes "precise hit"; unmounting the vision removes the interceptor with its fiber and falls back to blind grab; on vision failure the chain fails open and the grab flow continues.
 
 ### 7.10 Hot-plugging mechanism
 
 | Operation | Mechanism | Effect |
 |---|---|---|
-| Mount end-effector | after admission, register the instance on the **arm scope** at runtime (`ctx.plugin`) | effective immediately, **no restart** |
-| Unmount end-effector | arm-layer `fiber.dispose()` (async, exact cleanup) | precisely reclaims its subscriptions/connections; the other arm is unaffected |
+| Mount end-effector | after admission, register the instance on **every registered arm context** (one per session) at runtime (`ctx.plugin`) | effective immediately, **no restart** |
+| Unmount end-effector | `fiber.dispose()` on every arm context (async, exact cleanup) | precisely reclaims its subscriptions/connections; the other arm is unaffected |
 | Replace end-effector | unmount old instance + mount new (repo version dirs coexist) | agent-unaware; the same take_object automatically switches strategy |
 | Same-name isolation | arm scopes: same-name manipulate instances coexist, each with its own lifecycle | two end-effector instances never cross-talk |
 | Failure rollback | swap unmounts the old instance first (a brief window), then auto-restores it on failure (best effort, explicit alert if restore fails) | injected bad version → old end-effector restored and usable |
 | Change perception | event broadcast (tools/change) + agent subscription | the agent automatically perceives add/remove |
+| Session adaptation | new/resumed sessions rebuild their contexts lazily; the mount service mounts the current capability onto the new context | every session's arm context always carries the current end-effector |
 
 ### 7.11 Write/read path separation (the human is the only writer)
 
@@ -252,7 +256,7 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 | 6 | same-name isolation | arm scopes: same-name manipulate instances coexist | two arms with the same end-effector never cross-talk |
 | 7 | no leaks | arm scope + Cordis dispose | no residual subscription/state after unmount |
 
-> Zero-trust threat model: a capability may come from **external distribution** or be **generated by the agent on the fly** (an LLM can hallucinate or be prompt-injected), and may be **tampered in storage/transit**. Hence "treat every mount as untrusted, verify before mounting": the hash proves "not modified", the signature (optional) proves "truly from someone" — i.e. the "cloud sign/encrypt → device verify/decrypt" pipeline. The project ships the hash loop first.
+> Zero-trust threat model: a capability may come from **external distribution** or be **generated by the agent on the fly** (an LLM can hallucinate or be prompt-injected), and may be **tampered in storage/transit**. Hence "treat every mount as untrusted, verify before mounting": the hash proves "not modified". Signature verification is out of scope for this project.
 
 ---
 
@@ -271,7 +275,7 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 
 Three reasons for MuJoCo: ① the main line is motion control (MuJoCo's strength); ② zero background needs fast observable output (inline XML + `mj_step`); ③ 6GB VRAM + WSL2 hard constraint.
 
-**Switch triggers**: demo 14/15 (vision/imitation) → Isaac Sim + Isaac Lab; emphasizing full-stack ROS/sensors/navigation → Gazebo. Use MuJoCo Menagerie models.
+**Switch triggers**: photorealistic vision/imitation directions → Isaac Sim + Isaac Lab; emphasizing full-stack ROS/sensors/navigation → Gazebo. Use MuJoCo Menagerie models.
 
 ---
 
@@ -284,8 +288,8 @@ ros-hotplug-by-dsh/
 ├── src/
 │   ├── capabilities/              # ★ capability repo + mount service + spec
 │   │   ├── capability-spec.md     #    capability dev spec (template + manifest + mount flow)
-│   │   ├── mount_service/         #    capability mount service (host-resident: admission (inline sha256 guard) + arm bookkeeping; web panel included)
-│   │   ├── repo/                  #    capability repo directory (first-class deliverable): grasp/1.0.0/{host.js, manifest.json} ...
+│   │   ├── mount_service/         #    capability mount service (host-resident: sha256 admission + kind routing + arm/slot context bookkeeping + resident bridge daemon)
+│   │   ├── repo/                  #    capability repo directory (first-class deliverable): grasp/1.0.0|1.1.0|1.2.0, suction/1.0.0, camera_detect/1.0.0
 │   │   └── pack.sh                #    optional distribution shell: repo dir → npm tarball
 │   ├── packages/                   #    out-of-tree npm packages (installed into profile node_modules)
 │   │   └── cap-mount-panel/        #    end-effector panel (dual-face: host /cap-mount route + client tsdown bundle)
@@ -295,14 +299,13 @@ ros-hotplug-by-dsh/
 │   │   ├── cpp_control/           #    C++ high-rate control node (1kHz, PID)
 │   │   └── sim_bridge/            #    Python simulation bridge (MuJoCo + rclpy)
 │   ├── bridge/                    #    bridge contract
-│   │   ├── contract.md            #    topic/message schema (versioned)
+│   │   ├── contract.md            #    topic/message schema
 │   │   └── bridge_client.py       #    rosbridge client (SDK base)
 │   └── sim/                       #    visualization assets
 │       ├── models/                #    MJCF: arms/gripper/suction/ball
 │       └── scenes/                #    preset scenes
 ├── eval/                          # ★ evaluation
 │   ├── robot/  agent/  hotplug/
-│   └── native_swap/               #   native ROS2 end-effector swap measurement (to-be-measured experiment)
 ├── demo/                          #   teaching (00~13, the evidence chain)
 ├── docs/                          #   this design doc + highlights + mechanism + receipts
 └── plugins/                       #   dynamic plugin archive (workflow helpers)
@@ -325,34 +328,36 @@ ros-hotplug-by-dsh/
 - **First-class deliverable = the capability repo directory**: `repo/<capability>/<version>/{host.js, manifest.json}`. host.js is a zero-dependency ESM `{apply, inject, name}` plugin; manifest.json records metadata + host.js sha256.
 - **Capability = a strategy-bearing end-effector instance**: each capability is the complete unit of "end-effector hardware + driving strategy" (grasp = grasp strategy, suction = suction strategy). Its apply registers the same-name `manipulate` tool **on an arm scope**; execute implements the strategy (perceive physical match → run strategy steps → state verification) and **never changes assembly**.
 - **npm out-of-tree = optional distribution shell**: `pack.sh` turns a repo directory into a tarball; installing unpacks it into the repo and follows the same mount flow (install ≠ mount).
-- **Capability mount service (mount_service)**: host-resident plugin (composition-mounted, not a dynamic sandbox). Duties = **admission checks** (mount_guard hash + rule table: allowed end-effector types / same-arm dedup / replace) + **arm bookkeeping** (per-arm {arm, cap, version}); the actual `ctx.plugin`/`fiber.dispose` runs on the armA/armB contexts (scopes) registered by the in-session arm manager (§7.1). Write path = web panel RPC; **registers no agent tools**.
+- **Capability mount service (mount_service)**: host-resident plugin (composition-mounted, not a dynamic sandbox). Duties = **admission checks** (sha256 + kind routing: arm mount points accept end-effector only, the perception slot accepts sensor only + same-point dedup/replace) + **context bookkeeping** (per-session arm scopes and perception slots registered by the arm manager; newly registered contexts auto-mount the current capability; session teardown removes them symmetrically); the actual `ctx.plugin`/`fiber.dispose` runs on those contexts (scopes) (§7.1). Write path = web panel RPC; **registers no agent tools**.
 - **API form**: DSH's standard Tool contract; hot-plugging is DSH's runtime mount mechanism (ctx.plugin/dispose), and the repo directory is the carrier being hot-plugged.
 
 ### 10.4 L2 runtime carrier (agent preset)
 
 - **Form**: a **directory** (`~/.dsh/.agent-presets/robo/`), not an npm package.
-- **Contents**: `agent.cordis.yml` (composition: persona row + observer row + **arm-manager row** (pre-creates armA/armB scopes in-session and registers the arm contexts) + arm_status/take_object tool rows + skills mounting; **no capability rows** — assembly belongs to the mount system, the preset only perceives and executes), persona ("perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"), skills.
+- **Contents**: `agent.cordis.yml` (composition: persona row + observer row + **arm-manager row** (builds the arm scopes and the perception slot for every session and registers the arm contexts) + arm_status/take_object tool rows + skills mounting; **no capability rows** — assembly belongs to the mount system, the preset only perceives and executes), persona ("perceive end-effector state, decide adaptively, no low-level control, no end-effector detail"), skills.
 - **Function**: after install, choose "robo" when creating a session → an out-of-the-box robot task agent; the observer subscribes to `tools/change` and reports the capability set.
 - **API form**: cordis.yml composition declarations (plugin rows/scopes) + persona/skill text.
 
 ### 10.5 L3 robot side (ROS2 packages)
 
 - **Packages**: `cpp_control` (C++/rclcpp), `sim_bridge` (Python/rclpy + MuJoCo).
-- **Function**: `cpp_control` = 1kHz control loop, PID, trajectory tracking, latency measurement; `sim_bridge` = subscribes bridge commands, drives MuJoCo, `--view` visualization, publishes state feedback (the production form of demo 12/13's `arm_server.py`/`two_arm_server.py`).
+- **Function**: `cpp_control` = 1kHz control loop, PID, trajectory tracking, latency measurement; `sim_bridge` = subscribes bridge commands, drives MuJoCo, `--view` visualization, publishes state feedback (the two-arm scene runs `two_arm_server.py`).
 - **API form**: ROS2 message contract (see L4).
 - **Hand-written vs existing**: teaching/eval **hand-written** (learn principles, measure precisely); for a real robot, swap in `ros2_control`/`MoveIt2` per the contract, and the sim bridge can be replaced by `mujoco_ros2_control` (maintained by ros-controls). Hand-written and ready-made don't conflict — L3's interface is left replaceable, which is the adaptability point.
 
 ### 10.6 L4 bridge contract (external API — the only self-made API)
 
-**Layer 1: message contract (`bridge/contract.md`, versioned)**
+**Layer 1: message contract (`bridge/contract.md`)**
 
 ```text
-contract v1.x (full definition in bridge/contract.md)
+contract (full definition in bridge/contract.md)
   topic /tool_config    type std_msgs/String  payload "ARM:TOOL"   semantics: switch end-effector
   topic /ball_position  type std_msgs/String  payload "x,y"        semantics: set ball position
   topic /touch_command  type std_msgs/String  payload "A"|"B"      semantics: pick arm to touch ball
-  topic /reset_command  type std_msgs/String  payload "reset"      semantics: reset everything
-  topic /joint_state    type std_msgs/String  payload JSON          semantics: state feedback
+  topic /move_to        type std_msgs/String  payload "ARM:x,y"    semantics: converge the arm tip to XY
+  topic /home_command   type std_msgs/String  payload "A"|"B"      semantics: send one arm's joints home
+  topic /reset_command  type std_msgs/String  payload "reset"      semantics: reset everything (joints home/tools off/ball home)
+  topic /joint_state    type std_msgs/String  payload JSON          semantics: state feedback (joints/tools/ball/ee, 10 Hz)
 ```
 
 **Layer 2: thin Python SDK (shared by capability instances & DSH plugin hosts)**
@@ -362,6 +367,8 @@ class Bridge:
     def set_tool(self, arm, tool) -> dict:      # validates arm∈{A,B}, tool∈{grasp,suction,none}; returns {ok, error}
     def set_ball(self, x, y) -> dict:           # validates numeric; returns {ok, error}
     def touch(self, arm) -> dict:
+    def move_to(self, arm, x, y, timeout=3) -> dict:  # convergence-completing; returns {ok, ee, ball}
+    def home(self, arm) -> dict:                # send one arm's joints home
     def reset(self) -> dict:                    # reset everything
     def query_capabilities(self) -> dict:       # read current state from feedback
 ```
@@ -371,7 +378,7 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
 ### 10.7 Four principles of extensibility & adaptability
 
 1. **Standard capability interface**: capability = strategy-bearing instance + manifest; the agent only sees arm_status/take_object; adding an end-effector follows the `capability-spec.md` template without touching the framework or the agent interface.
-2. **Versioned message contract**: schema documented; both ends evolve independently.
+2. **Documented message contract**: schema documented; both ends implement the same contract.
 3. **Capabilities decoupled from presets**: capabilities don't depend on presets (presets neither assemble nor perceive end-effector models, only `ready`); presets don't depend on specific capabilities.
 4. **Same interface for sim & real robot**: swap only the L3 bottom (`ros2_control hardware_interface`); L1/L2/L4 untouched.
 
@@ -385,7 +392,6 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
 - **Robot dimension (`eval/robot`)**: IK accuracy/success/time, three trajectory interpolation comparisons, control rate/jitter/latency — against the §11.2 public baselines.
 - **AI orchestration dimension (`eval/agent`)**: agent vs script oracle vs random, success rate + steps — proving "agent adaptive orchestration matters".
 - **Hot-plug dimension (`eval/hotplug`)**: the five §11.3 acceptance criteria.
-- **Scenario-level comparison (`eval/native_swap`)**: same two-arm MuJoCo scene, "native ROS2 end-effector swap (stop node → edit config → restart → rewire)" vs "this project's hot-plug (mount/unmount)", measuring time and manual steps — **must be measured, never prefilled**.
 
 ### 11.2 Robot-side public baselines
 
@@ -411,7 +417,6 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
 
 ### 11.4 To-be-measured (never prefilled)
 
-- "Native ROS2 end-effector swap" time/steps: no public data; must be measured in our own scene.
 - Agent adaptive-strategy success rate/steps: only after running `eval/agent`.
 
 ---
@@ -423,7 +428,7 @@ Design points: validation lives in the SDK (capability devs don't rewrite it); r
   one SDK call costs about 100 ms (measured locally: query_capabilities avg 100 ms, dominated by the 10 Hz
   state-feedback interval; publish-only calls avg 101 ms, dominated by the send flush) — monitoring/task-grade
   latency, not real-time control; real-time stays in the cpp_control 1 kHz layer.
-- Future: real hardware (`ros2_control hardware_interface`), cross-process/machine hot-plugging, integration with data loop / world models (demo 14/15).
+- Future: real hardware (`ros2_control hardware_interface`), cross-process/machine hot-plugging, photorealistic vision and data loop / world model integration.
 
 ## 13. Disclosure & timestamps
 

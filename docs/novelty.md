@@ -21,7 +21,7 @@
 ### 1.3 OpenRAL (closest; named honestly)
 
 - **Mechanism**: a ROS2-native agentic harness wrapping ROS2 capabilities as **rskill**s exposed to an LLM agent as tool calls.
-- **Limits**: it solves "let the agent call ROS2", but offers a skill library + call protocol, **not DSH's "layered scopes + isolate realm + Cordis dispose" composition primitive** — overlapping on "tool-ification", but lacking the anchor of "spatial visibility + precise temporal teardown + version timeline".
+- **Limits**: it solves "let the agent call ROS2", but offers a skill library + call protocol, **not DSH's "layered scopes + Cordis dispose" composition primitive** — overlapping on "tool-ification", but lacking the anchor of "spatial visibility + precise temporal teardown + version timeline".
 - Source: [OpenRAL — agentic harness for physical AI](https://discourse.openrobotics.org/t/openral-the-agentic-harness-for-physical-ai-ros-2-native/56352).
 
 ### 1.4 Generic software hot-plugging (cross-domain, wrong granularity)
@@ -32,7 +32,7 @@
 
 [Software Reconfiguration in Robotics (EMSE 2024)](https://link.springer.com/article/10.1007/s10664-024-10596-9) systematically organizes the major families (dynamic software product lines, model-based, component-based, …) and points to a shared gap: **reconfiguration mostly stays at the "structure/behavior" layer, lacking a link to the upper task/decision layer, and lacking unified runtime safety and consistency guarantees**.
 
-> In one sentence: existing solutions manage either "process/node", "component graph", or "skill call", but none binds "visible to whom now (space)", "when born, when precisely reclaimed (time)", and "how to grayscale/rollback versions" to the same anchor.
+> In one sentence: existing solutions manage either "process/node", "component graph", or "skill call", but none binds "visible to whom now (space)", "when born, when precisely reclaimed (time)", and "how to coexist versions and roll back" to the same anchor.
 
 ---
 
@@ -40,7 +40,7 @@
 
 | Work | Category | Relation to this project | Difference (this project's unique anchor) |
 |---|---|---|---|
-| ROS2 lifecycle/composable nodes | ROS component lifecycle | official robot-side "partial hot-plug" | manages node state only; no agent visibility, same-type isolation, grayscale/rollback |
+| ROS2 lifecycle/composable nodes | ROS component lifecycle | official robot-side "partial hot-plug" | manages node state only; no agent visibility, same-type isolation, version rollback |
 | AICA | component-based reconfigurable robotics | declarative components + runtime reconfiguration | hardware/component layer; no LLM/agent orchestration layer |
 | Eclipse Muto | dynamic ROS stack orchestration | runtime ROS component orchestration | AV deployment orchestration, not agent-layer capability hot-plugging |
 | OpenRAL | ROS2-native agentic harness | closest (agent + ROS2) | this project's unique anchor = the specific "DSH spatiotemporal compositionality" primitive |
@@ -53,9 +53,9 @@
 
 ## 3. Project highlights: DSH spatiotemporal compositionality × capability hot-plugging (source/architecture evidence)
 
-### 3.1 Space axis: scopes + isolate realm (who sees whom)
+### 3.1 Space axis: layered scopes (who sees whom)
 
-- End-effector capability instances sit on per-arm scopes below the agent (global → agent → arm → instance); the agent perceives only a `ready` boolean and executes through `take_object`, while the grasp/suction strategies live inside the instances; sibling arm scopes let same-name instances coexist without cross-talk.
+- Capability instances sit on **per-arm scopes** below the agent (global → agent → arm → instance; one set per session) or on the **perception slot** at the agent layer (sensor class); the agent perceives only a `ready` boolean and executes through `take_object`, while the strategies live inside the instances; sibling arm scopes let same-name instances coexist without cross-talk.
 - **Advantage**: mounting = immediately effective and agent-visible; same-name end-effectors never conflict. Other solutions lack this primitive.
 
 ### 3.2 Time axis: Cordis lifecycle (who lives and dies when)
@@ -87,7 +87,7 @@
 | ROS2 lifecycle / composable | process/node | ✗ | ✗ (self-discipline) | ✗ (hand-written) | ✗ |
 | AICA | component graph | ✗ | partial | ✗ | ✗ |
 | OpenRAL | skill call | ✗ | ✗ | ✗ | ✓ |
-| **DSH spatiotemporal compositionality** | **capability tool** | **✓ isolate / nearest-wins** | **✓ dispose** | **✓ package / run** | **✓** |
+| **DSH spatiotemporal compositionality** | **capability tool** | **✓ arm-scope isolation** | **✓ dispose** | **✓ version dirs + handles** | **✓** |
 
 ---
 
@@ -101,8 +101,8 @@
 
 | Component | Content |
 |---|---|
-| Mechanism | DSH layered scopes + nearest-wins + isolate realm + Cordis dispose + version timeline |
-| Scenario | embodied-robot capability hot-plugging (end-effectors / sensors / skills) |
+| Mechanism | DSH layered scopes (arm scopes / perception slot) + parent-chain inheritance + Cordis dispose + capability version dirs & mount handles |
+| Scenario | embodied-robot capability hot-plugging (end-effectors / sensors) |
 | Implementation | reproducible `demo/13-hotplug` + source engineering + evaluation |
 
 ### 5.3 Explicitly not claimed
@@ -112,7 +112,7 @@ Not inventing "spatiotemporal compositionality" (DSH's mechanism); not "first ro
 ### 5.4 Verification & escalation path
 
 - Not seen in public sources: periodic searches recorded (keywords: `DSH 时空组合性 机器人 热插拔`, `DSH spatiotemporal hot-plug robot`, `DeepSeek Harness robotics hot-plug`, `Cordis scope robot reconfiguration`).
-- Reproducible: run `demo/13-hotplug` and reproduce the four indicators.
+- Reproducible: run `demo/13-hotplug` and reproduce the hot-plug acceptance criteria (design §11.3).
 - Temporal priority: commit hash + timestamps + push in `disclosure-log.md`.
 - Wording escalation: internal statement (now) → public blog → arXiv (drop "first", experiments decide).
 

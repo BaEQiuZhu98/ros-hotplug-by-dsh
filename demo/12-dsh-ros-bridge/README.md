@@ -75,7 +75,7 @@ In a cordis session:
 
 ## How it relates to the final goal
 
-- This is the foundation for demo 13's hot-plugging flagship: demo 13 will add/remove "capability tools" (grasp/suction/detect…) at runtime on this "DSH ↔ ROS2" bridge, and each capability ultimately drives ROS2 through it.
+- This is the foundation for demo 13's hot-plugging flagship: demo 13 adds/removes "capability tools" (grasp/suction/detect…) at runtime, and each capability ultimately drives ROS2 through a bridge like this one.
 - "agent / web frontend calls ROS2 via rosbridge" is the hard evidence of "connecting DSH to the robot" on the resume.
 
 ## Appendix: plugin code & reloading after restart

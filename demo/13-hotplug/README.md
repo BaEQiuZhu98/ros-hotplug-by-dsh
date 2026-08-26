@@ -30,7 +30,7 @@ This demo has **two complementary paths**:
 
 - Capability = DSH plugin tool: mount/unmount = `cordis_run`/`cordis_stop`.
 - Pre-mount zero-trust verification (manifest hash).
-- The 7 reliability points: verify / multi-version / grayscale / rollback / event / shadowing / reclamation.
+- The 7 reliability points: verify / multi-version / swap / rollback / event / shadowing / reclamation.
 - One chain: capability → rosbridge → ROS2 topic → MuJoCo visualization.
 
 ## How to run (path A: agent tool hot-plugging)
@@ -78,13 +78,13 @@ In a cordis session, pass `web_hotplug_panel.js`'s host half as `code.host` and 
 ## What to observe
 
 1. **Mount-and-see / unmount-and-reclaim**: after mount the agent's tool table gains `grasp`; after unmount it disappears with no residue.
-2. **Multi-version / grayscale / rollback**: see `hotplug_walkthrough.md` (actually demonstrated this session).
+2. **Multi-version / swap / rollback**: see `hotplug_walkthrough.md` (actually demonstrated this session).
 3. **Two-arm visualization closed loop**: the web panel changes config/ball position → the MuJoCo window follows live.
 
 ## How it relates to the final goal
 
 - This is the **implementation** of the project's novelty claim: `DSH spatiotemporal compositionality × capability hot-plugging × reproducible demo`.
-- In interviews, "runtime end-effector swap + zero-trust check + grayscale rollback" is the hard differentiator.
+- In interviews, "runtime end-effector swap + zero-trust check + swap rollback" is the hard differentiator.
 
 ## Appendix: reload after restart
 
