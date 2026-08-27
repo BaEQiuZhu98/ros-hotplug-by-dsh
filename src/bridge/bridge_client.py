@@ -10,6 +10,7 @@ bridge_client.py - 桥接薄 SDK(能力实例与普通 Python 脚本共用的唯
     set_tool(arm, tool)         切末端执行器(arm ∈ {A,B}; tool ∈ {grasp,suction,none})
     set_ball(x, y)              设置小球位置(有限数字)
     home(arm)                   该臂关节回原位(伸直, 不动末端与小球)
+    set_vision_visual(on/off)   视觉传感器可见性(挂载 camera_detect 时显示)
     reset()                     全部复位(关节归零/末端卸下/小球回初始)
     touch(arm)                  选臂触碰小球
     move_to(arm, x, y, timeout) 收敛完成式移动到指定 XY(契约 v1.2, 返回 {ok, ee, ball})
@@ -107,6 +108,13 @@ class Bridge:
         if arm not in VALID_ARMS:
             return {'ok': False, 'error': '非法臂 "%s", 只能是 A 或 B' % arm}
         return self._publish('/home_command', arm)
+
+    def set_vision_visual(self, state):
+        """视觉传感器可见性(挂载 camera_detect 时显示). state ∈ {on, off}."""
+        state = str(state).strip().lower()
+        if state not in ('on', 'off'):
+            return {'ok': False, 'error': '非法状态 "%s", 只能是 on 或 off' % state}
+        return self._publish('/sensor_visual', state)
 
     def touch(self, arm):
         """选臂触碰小球. 若该臂无末端, sim_bridge 侧会拒绝并告警."""
@@ -246,6 +254,8 @@ def daemon_main():
             result = bridge.set_ball(args[0], args[1])
         elif method == 'home' and len(args) >= 1:
             result = bridge.home(args[0])
+        elif method == 'set_vision_visual' and len(args) >= 1:
+            result = bridge.set_vision_visual(args[0])
         elif method == 'touch' and len(args) >= 1:
             result = bridge.touch(args[0])
         elif method == 'move_to' and len(args) >= 3:
@@ -268,7 +278,7 @@ if __name__ == '__main__':
 
     if len(_sys.argv) < 2:
         # 失败路径统一输出 JSON(契约 §5, T-A-28): 参数不足也是 {ok:false} + 退出码 1.
-        print(json.dumps({'ok': False, 'error': '用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|home ARM|touch ARM|reset|query_capabilities|daemon>'},
+        print(json.dumps({'ok': False, 'error': '用法: bridge_client.py <set_tool ARM TOOL|set_ball X Y|home ARM|set_vision_visual on|off|touch ARM|reset|query_capabilities|daemon>'},
                          ensure_ascii=False))
         _sys.exit(1)
     method = _sys.argv[1]
@@ -287,6 +297,8 @@ if __name__ == '__main__':
             result = bridge.set_ball(_sys.argv[2], _sys.argv[3])
         elif method == 'home' and len(_sys.argv) >= 3:
             result = bridge.home(_sys.argv[2])
+        elif method == 'set_vision_visual' and len(_sys.argv) >= 3:
+            result = bridge.set_vision_visual(_sys.argv[2])
         elif method == 'touch' and len(_sys.argv) >= 3:
             result = bridge.touch(_sys.argv[2])
         elif method == 'move_to' and len(_sys.argv) >= 5:

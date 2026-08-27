@@ -23,6 +23,7 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 | `/touch_command` | 客户端 → sim_bridge | `std_msgs/String` | `"A"` 或 `"B"` | 选臂触碰小球 |
 | `/move_to` | 客户端 → sim_bridge | `std_msgs/String` | `"ARM:x,y"` | 指定臂末端收敛移动到指定 XY(§3.6) |
 | `/home_command` | 客户端 → sim_bridge | `std_msgs/String` | `"A"` 或 `"B"` | 该臂关节回原位(伸直; 不动末端/小球/另一臂, §3.7) |
+| `/sensor_visual` | 客户端 → sim_bridge | `std_msgs/String` | `"on"` 或 `"off"` | 视觉传感器画面显示/隐藏(挂载 camera_detect 时 on, 卸载 off) |
 | `/reset_command` | 客户端 → sim_bridge | `std_msgs/String` | `"reset"` | 全部复位(关节归零/末端卸下/小球回初始) |
 | `/joint_state` | sim_bridge → 客户端 | `std_msgs/String` | JSON(见 §3) | 状态回传(10 Hz 反馈) |
 
@@ -65,7 +66,7 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 ### 3.5 `/reset_command`
 
 - 格式: `"reset"`(载荷值不校验, 收到即复位).
-- 语义: 关节目标归零(平滑回伸直) + 末端全部卸下(灰) + 小球回 (0.5, 0).
+- 语义: 关节目标归零(平滑回伸直) + 末端全部卸下(灰) + 小球回 (0.35, 0).
 
 ### 3.6 `/move_to`
 
@@ -77,7 +78,13 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
   - 成功返回 `{ok: true, ee: [x, y], ball: [bx, by]}`(ee 为收敛时读到的末端位置, ball 同帧小球位置)——「返回即已到位」, 命中判定由调用方用 ee 与 ball 距离完成(sim 算、能力只判).
   - **超时层级不变量**: SDK move_to 超时 3s 必须小于挂载服务 bridge 层的 5s 兜底, 调整任一侧时同步核对(见 mount_service/host.js 注释).
 
-### 3.7 `/home_command`
+### 3.7 `/sensor_visual`
+
+- 格式: `"on"` 或 `"off"`(载荷不区分大小写, 忽略空白).
+- 语义: 控制仿真场景中视觉传感器(相机盒)的显示: `"on"` = 显示(视觉能力挂载), `"off"` = 隐藏.
+  视觉传感器是场景级装饰, 不参与物理仿真(不碰撞、不影响运动学).
+
+### 3.8 `/home_command`
 
 - 格式: `"A"` 或 `"B"`(臂名 ∈ {A, B}, 与 `/touch_command` 同风格).
 - 语义: 该臂关节目标归零(平滑回伸直, 与 `/reset_command` 同机制但只动单臂), 不改变末端装配与小球位置. 用于面板「臂X复位」: 卸载 + 末端复位 + 回原位.
@@ -90,7 +97,8 @@ ROS2 话题 ──► sim_bridge 节点(MuJoCo 双臂仿真)
 | `set_ball(x, y)` | `/ball_position` | `"x,y"` | x/y 为有限数字 |
 | `touch(arm)` | `/touch_command` | `"A"`/`"B"` | arm ∈ {A, B} |
 | `move_to(arm, x, y, timeout=3)` | `/move_to` | `"ARM:x,y"` | arm ∈ {A, B}; x/y 为有限数字; 收敛完成式(§3.6), 返回 {ok, ee, ball} |
-| `home(arm)` | `/home_command` | `"A"`/`"B"` | arm ∈ {A, B}; 该臂关节回原位(§3.7) |
+| `home(arm)` | `/home_command` | `"A"`/`"B"` | arm ∈ {A, B}; 该臂关节回原位(§3.8) |
+| `set_vision_visual(on/off)` | `/sensor_visual` | `"on"`/`"off"` | 视觉传感器画面显示/隐藏(§3.7) |
 | `reset()` | `/reset_command` | `"reset"` | - |
 | `query_capabilities()` | 订阅 `/joint_state` | - | 解析 §3.4 JSON, 返回能力集 |
 

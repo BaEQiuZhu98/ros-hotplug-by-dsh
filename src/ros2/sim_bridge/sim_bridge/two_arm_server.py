@@ -64,11 +64,11 @@ ARMS = {
     'B': {'base': np.array([0.0, 0.5]), 'joints': ('B_joint1', 'B_joint2'), 'tool': 'B_tool'},
 }
 
-# 末端执行器指示颜色: 红 = 夹爪, 蓝 = 吸盘, 灰 = 无.
+# 末端执行器指示颜色(Okabe-Ito 色盲安全分类色板): 浅灰 = 无, 翠绿 = 夹爪, 绛紫红 = 吸盘.
 COLORS = {
-    'grasp': [0.9, 0.2, 0.2, 1.0],
-    'suction': [0.2, 0.5, 0.9, 1.0],
-    'none': [0.6, 0.6, 0.6, 1.0],
+    'grasp': [0.00, 0.62, 0.45, 1.0],
+    'suction': [0.80, 0.47, 0.65, 1.0],
+    'none': [0.85, 0.85, 0.85, 1.0],
 }
 
 JOINT_STATE_RATE = 10.0  # /joint_state 发布频率(Hz), 反馈给 SDK 查询能力集
@@ -120,12 +120,19 @@ class TwoArmServer(Node):
 
         ball_body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'ball')
         self.ball_mocap = model.body_mocapid[ball_body]
+        # 视觉传感器几何(相机盒 + 镜头): 挂载 camera_detect 后显示, 默认隐藏(alpha=0).
+        self.vision_geoms = []
+        for name in ('vision_body_geom', 'vision_lens_geom'):
+            gid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            if gid != -1:
+                self.vision_geoms.append(gid)
+        self._set_vision_visible(False)
 
         # 运行状态.
         self.tools = {'A': 'none', 'B': 'none'}
         self.targets = {'A': np.array([0.0, 0.0]), 'B': np.array([0.0, 0.0])}
-        self.ball = np.array([0.5, 0.0])  # 小球当前 XY 位置
-        data.mocap_pos[self.ball_mocap] = [0.5, 0.0, 0.5]
+        self.ball = np.array([0.35, 0.0])  # 小球当前 XY 位置(场景中心附近)
+        data.mocap_pos[self.ball_mocap] = [0.35, 0.0, 0.5]
 
         self.create_subscription(String, 'tool_config', self.on_tool_config, 10)
         self.create_subscription(String, 'touch_command', self.on_touch, 10)
@@ -133,6 +140,7 @@ class TwoArmServer(Node):
         self.create_subscription(String, 'ball_position', self.on_ball_position, 10)
         self.create_subscription(String, 'reset_command', self.on_reset, 10)
         self.create_subscription(String, 'home_command', self.on_home, 10)
+        self.create_subscription(String, 'sensor_visual', self.on_vision_visual, 10)
 
         self.state_pub = self.create_publisher(String, 'joint_state', 10)
         self.create_timer(1.0 / JOINT_STATE_RATE, self.publish_joint_state)
@@ -145,9 +153,9 @@ class TwoArmServer(Node):
         for arm in ARMS:
             self.tools[arm] = 'none'
             self.model.geom_rgba[self.tool_ids[arm]] = COLORS['none']
-        self.ball = np.array([0.5, 0.0])
-        self.data.mocap_pos[self.ball_mocap] = [0.5, 0.0, 0.5]
-        self.get_logger().info('全部复位: 关节归零, 末端卸下, 小球回 (0.5, 0)')
+        self.ball = np.array([0.35, 0.0])
+        self.data.mocap_pos[self.ball_mocap] = [0.35, 0.0, 0.5]
+        self.get_logger().info('全部复位: 关节归零, 末端卸下, 小球回 (0.35, 0)')
 
     def on_home(self, msg):
         # 单臂回原位(面板「臂X复位」): 该臂关节目标归零(平滑回伸直), 不动末端/小球/另一臂.
@@ -157,6 +165,21 @@ class TwoArmServer(Node):
             return
         self.targets[arm] = np.array([0.0, 0.0])
         self.get_logger().info('臂 %s 回原位(关节归零)' % arm)
+
+    def _set_vision_visible(self, visible):
+        # 视觉传感器显示/隐藏: 通过 alpha 0<->1 切换(渲染对 alpha=0 的几何不绘制).
+        alpha = 1.0 if visible else 0.0
+        for gid in self.vision_geoms:
+            self.model.geom_rgba[gid][3] = alpha
+
+    def on_vision_visual(self, msg):
+        # 载荷 "on"|"off": 视觉传感器可见性(挂载 camera_detect 时显示, 卸载隐藏).
+        state = msg.data.strip().lower()
+        if state not in ('on', 'off'):
+            self.get_logger().warn('非法传感器显示指令: %s' % msg.data)
+            return
+        self._set_vision_visible(state == 'on')
+        self.get_logger().info('视觉传感器显示 -> %s' % state)
 
     def on_tool_config(self, msg):
         # 载荷格式 "A:grasp" / "B:suction" / "A:none".
@@ -294,7 +317,18 @@ def run_view(node):
     """可视化模式: 渲染循环里 spin_once 处理 ROS 回调, 不阻塞渲染."""
     import mujoco.viewer
     dt = 0.02  # 渲染步长(50 Hz)
-    with mujoco.viewer.launch_passive(node.model, node.data) as viewer:
+    # 只显示中间 3D 画面(隐藏左右功能栏, 录屏/演示更干净); 需要面板时去掉这两个参数.
+    with mujoco.viewer.launch_passive(node.model, node.data,
+                                      show_left_ui=False, show_right_ui=False) as viewer:
+        # 初始视角: 自由相机对准场景内容中心(双臂 + 小球, 不含地板), 斜上方俯视;
+        # 内容包围: x∈[0,0.8](臂基座 0 到臂端+工具 0.8), y∈[-0.5,0.5], z∈[0.5,0.8].
+        # lookat 取内容中心 (0.4, 0, 0.55); 相机从 +y 侧斜上方看(azimuth=90), 画面左右对称.
+        viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+        viewer.cam.lookat = np.array([0.45, 0.0, 0.52])
+        viewer.cam.distance = 2.5
+        viewer.cam.azimuth = 90.0
+        viewer.cam.elevation = -20.0
+        viewer.sync()
         while viewer.is_running() and rclpy.ok():
             rclpy.spin_once(node, timeout_sec=0.0)
             node.step(dt)

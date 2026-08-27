@@ -1,41 +1,51 @@
-<!-- two_arm_scene.xml - 双臂 + 小球默认场景 (由 demo/13 two_arm_server.py 内联 XML 固化而来).
+<!-- two_arm_scene.xml - 双臂 + 小球默认场景.
 
      两条二连杆臂(绕 Z 轴, 在 XY 平面), 臂 A 在下方、臂 B 在上方, 中间一个小球.
      小球用 mocap 表示: 位置可被代码随时改写, 模拟"任务目标移动".
-     末端执行器用彩色小球表示: 红 = 夹爪(grasp), 蓝 = 吸盘(suction), 灰 = 无(none).
+     颜色约定:
+       机械臂 A = 红色系, 机械臂 B = 蓝色系(两臂同框区分);
+       末端执行器 = 白(夹爪 grasp) / 黑(吸盘 suction) / 灰(无 none), 由代码切换;
+       视觉传感器(场景右上方相机盒 + 镜头)初始隐藏(alpha=0), 挂载 camera_detect
+       能力后由 sim 收到 /sensor_visual 显示.
      本文件是唯一模型来源: sim_bridge 默认从这里加载, 修改后无需改代码. -->
 <mujoco>
   <option gravity="0 0 -9.81"/>
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1"/>
-    <geom name="floor" type="plane" size="2 2 0.1" rgba="0.8 0.8 0.8 1"/>
+    <geom name="floor" type="plane" size="2 2 0.1" rgba="0.61 0.61 0.61 1"/>
 
     <!-- 小球(mocap: 位置可被代码改) -->
-    <body name="ball" mocap="true" pos="0.5 0 0.5">
-      <geom name="ball_geom" type="sphere" size="0.05" rgba="1 0.8 0 1"/>
+    <body name="ball" mocap="true" pos="0.35 0 0.5">
+      <geom name="ball_geom" type="sphere" size="0.05" rgba="0.94 0.89 0.26 1"/>
     </body>
 
-    <!-- 机械臂 A -->
+    <!-- 视觉传感器(相机盒 + 镜头, 初始隐藏; 挂载 camera_detect 后显示) -->
+    <body name="vision_sensor" pos="0.72 0 0.8">
+      <geom name="vision_body_geom" type="box" size="0.06 0.04 0.04" rgba="0.25 0.25 0.3 0"/>
+      <geom name="vision_lens_geom" type="cylinder" size="0.02 0.025" fromto="0.06 0 0 -0.06 0 0" rgba="0.05 0.05 0.1 0"/>
+    </body>
+
+    <!-- 机械臂 A(红色系) -->
     <body name="A_link1" pos="0 -0.5 0.5">
       <joint name="A_joint1" type="hinge" axis="0 0 1"/>
-      <geom name="A_link1_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.9 0.3 0.3 1"/>
+      <geom name="A_link1_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.00 0.45 0.70 1"/>
       <body name="A_link2" pos="0.4 0 0">
         <joint name="A_joint2" type="hinge" axis="0 0 1"/>
-        <geom name="A_link2_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.3 0.5 0.9 1"/>
+        <geom name="A_link2_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.00 0.45 0.70 1"/>
         <site name="A_ee" pos="0.4 0 0"/>
-        <geom name="A_tool" type="sphere" size="0.06" pos="0.4 0 0" rgba="0.6 0.6 0.6 1"/>
+        <geom name="A_tool" type="sphere" size="0.06" pos="0.4 0 0" rgba="0.85 0.85 0.85 1"/>
       </body>
     </body>
 
-    <!-- 机械臂 B -->
+    <!-- 机械臂 B(蓝色系) -->
     <body name="B_link1" pos="0 0.5 0.5">
       <joint name="B_joint1" type="hinge" axis="0 0 1"/>
-      <geom name="B_link1_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.2 0.7 0.3 1"/>
+      <geom name="B_link1_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.90 0.62 0.00 1"/>
       <body name="B_link2" pos="0.4 0 0">
         <joint name="B_joint2" type="hinge" axis="0 0 1"/>
-        <geom name="B_link2_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.2 0.7 0.3 1"/>
+        <geom name="B_link2_geom" type="capsule" size="0.03" fromto="0 0 0 0.4 0 0" rgba="0.90 0.62 0.00 1"/>
         <site name="B_ee" pos="0.4 0 0"/>
-        <geom name="B_tool" type="sphere" size="0.06" pos="0.4 0 0" rgba="0.6 0.6 0.6 1"/>
+        <geom name="B_tool" type="sphere" size="0.06" pos="0.4 0 0" rgba="0.85 0.85 0.85 1"/>
       </body>
     </body>
   </worldbody>

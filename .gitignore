@@ -23,6 +23,10 @@ render/
 results/
 *.csv
 
+# docs/assets 下的演示 gif 入库(README 引用, 例外于 *.gif)
+!docs/assets/
+!docs/assets/*.gif
+
 # OS / editor
 .DS_Store
 .vscode/

@@ -165,7 +165,7 @@ dynamically (extending physical arms additionally requires model + contract chan
 | 5 | mount service | dynamic-import host.js (the strategy-bearing plugin module), ready to mount on the arm contexts |
 | 6 | mount service | ctx.plugin(plugin) on **every registered armA context** (one per session) → apply registers the `manipulate` instance (same name, armA layer); fiber.await confirms activation; failure → dispose & reject |
 | 7 | mount service | record {armA: grasp@1.2.0, handle}; tools/change broadcast (observer updates the capability report); contexts registered later auto-get the current end-effector |
-| 8 | panel host | mount ok → physical assembly set_tool(A, grasp) (sim_bridge turns arm A's tip red; physical failure only warns, never rolls back a successful registration) |
+| 8 | panel host | mount ok → physical assembly set_tool(A, grasp) (sim_bridge turns arm A's tip white (gripper); physical failure only warns, never rolls back a successful registration) |
 | 9 | panel client | refresh: the arm A dropdown shows grasp@1.2.0 |
 | 10 | agent | next arm_status(A) = {ready: true}; take_object(A) runs the grasp strategy |
 
@@ -225,9 +225,9 @@ read path (agents):     task agent ──► arm_status (perceive) + take_object
 1. Scene: two arms + a ball, both arms bare.
 2. User: "**grab the ball**". Agent perceives: both arm_status not ready → replies "no end-effector, cannot grab".
 3. Human hot-plugs: panel mounts the grasp capability (grasp strategy instance) on arm A.
-4. User again: "**grab the ball**". Agent perceives: arm A ready → calls `take_object(A)` → the instance runs the grasp strategy → arm A's tip turns red and moves to the ball (grasp).
+4. User again: "**grab the ball**". Agent perceives: arm A ready → calls `take_object(A)` → the instance runs the grasp strategy → arm A's tip turns white (gripper) and moves to the ball (grasp).
 5. Human hot-plugs: panel swaps arm A from grasp to suction (unmount old instance, mount the suction strategy instance).
-6. User a third time: "**grab the ball**". Agent perceives: arm A still ready → calls `take_object(A)` again → the instance is now the suction strategy → tip turns blue and moves to the ball (suction).
+6. User a third time: "**grab the ball**". Agent perceives: arm A still ready → calls `take_object(A)` again → the instance is now the suction strategy → tip turns black (suction cup) and moves to the ball (suction).
 
 > The highlight: **the same command and the same API, three results matched to the current end-effector state**; the agent is unaware throughout, the robot never stops, and the agent never learns the "gripper/suction" implementation details.
 
@@ -318,7 +318,7 @@ ros-hotplug-by-dsh/
 │   ├── lib/                        #   robenv + result aggregation (summary.py)
 │   └── results/                    #   run records (run-* dirs, not committed)
 ├── demo/                           # tutorial dirs (00~13, see demo/README.md)
-├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log (+ timestamps)
+├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log (+ timestamps / demo gifs under assets)
 └── plugins/                        # dynamic plugin archive (two workflow plugins)
 ```
 

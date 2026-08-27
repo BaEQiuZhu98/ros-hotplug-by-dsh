@@ -53,9 +53,21 @@ export function apply(ctx, config = {}) {
     return next()
   })
 
+  // 视觉传感器画面显示与挂载联动(热插拔可观察): 挂载时让 sim 显示相机盒, 卸载隐藏.
+  // fire-and-forget: 失败只告警, 不阻塞能力激活.
+  function setVisionVisible(on) {
+    ctx.capabilityMount.bridge('set_vision_visual', [on ? 'on' : 'off']).then(
+      (r) => {
+        if (r && r.ok !== true) console.warn('[camera-detect] 视觉传感器显示失败: %s', (r.error || JSON.stringify(r)))
+      },
+      (e) => console.warn('[camera-detect] 视觉传感器显示失败: %s', e && e.message))
+  }
+  setVisionVisible(true)
+
   console.log('[capability-camera-detect] 感知能力已挂载(视觉数据注入执行链)')
 
   return () => {
+    setVisionVisible(false)
     unregisterDetect()
     offIntercept()
   }

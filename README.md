@@ -4,118 +4,77 @@
 
 ---
 
-## Novelty claim (one sentence)
+# Environment setup
 
-> **The first to apply DSH spatiotemporal compositionality (layered scopes + Cordis lifecycle) to hot-plugging of embodied-robot capabilities, with a reproducible implementation and evaluation.**
+1. **Robot side (ROS2 + simulation)**
+   - Terminal 1: `ros2 launch rosbridge_server rosbridge_websocket_launch.xml` (rosbridge channel)
+   - Terminal 2: `source /opt/ros/humble/setup.bash && source /root/venvs/robo/bin/activate`, then run `python3 src/ros2/sim_bridge/sim_bridge/two_arm_server.py --view` (two-arm MuJoCo view)
 
-- Does *not* claim to have invented spatiotemporal compositionality (that is DSH's mechanism).
-- Does *not* claim to be first at robot hot-plugging (ROS2 lifecycle nodes, AICA, etc. already exist).
-- Claims the combination of **this mechanism × this scenario × this implementation**, reproducibly verified.
+2. **DSH web (panel & capability system)**
+   - `bash src/setup.sh` one-shot installs the mount-service row, the capability panel package, and the robo preset (path centralization)
+   - Restart `dsh web`; after the page refreshes, the **capability panel** appears above the input area
 
-See [`docs/design.md`](docs/design.md) for the precise boundary.
-
----
-
-## Repository layout
-
-```
-ros-hotplug-by-dsh/
-├── README.zh.md / README.md        # this file (zh / en)
-├── LICENSE / .gitignore
-├── src/                            # source engineering (see src/README.zh.md)
-│   ├── setup.sh                    #    one-shot install (path centralization: mount row / panel pkg / robo preset)
-│   ├── capabilities/               #    ★ capability repo + mount service + spec
-│   │   ├── capability-spec.md      #      capability dev spec (template + manifest + mount flow)
-│   │   ├── mount_service/          #      capability mount service (host-resident: sha256 admission + kind routing + arm/slot context bookkeeping + resident bridge daemon)
-│   │   ├── repo/                   #      capability repo directory (first-class deliverable): grasp/1.0.0|1.1.0|1.2.0, suction/1.0.0, camera_detect/1.0.0
-│   │   └── pack.sh                 #      optional distribution shell: repo dir → npm tarball
-│   ├── packages/                   #    out-of-tree npm packages (installed into profile node_modules)
-│   │   └── cap-mount-panel/        #      capability panel (dual-face: host /cap-mount route + client tsdown bundle)
-│   ├── presets/                    #    runtime carrier
-│   │   └── robo/                   #      robot task agent preset (composition + persona + skills)
-│   │       └── arm_manager/        #        out-of-tree arm-manager package (arm scopes / perception slot + tools)
-│   ├── ros2/                       #    robot side (colcon packages; build/install/log are build artifacts, not committed)
-│   │   ├── cpp_control/            #     C++ 1kHz scalar PID loop + rate/jitter/compute-time measurement
-│   │   └── sim_bridge/             #     Python simulation bridge (MuJoCo + rclpy)
-│   ├── bridge/                     #    bridge contract
-│   │   ├── contract.md             #      topic/message schema (v1.2)
-│   │   └── bridge_client.py        #     rosbridge client (thin SDK)
-│   └── sim/                        #    visualization assets
-│       ├── models/                 #     MJCF: two_arm_scene.xml (two arms + ball)
-│       └── scenes/                 #     preset scene notes
-├── eval/                           # ★ evaluation
-│   ├── robot/                      #   IK timing magnitude (against public baselines)
-│   ├── agent/                      #   task set & criteria (agent vs oracle vs random evaluation)
-│   ├── hotplug/                    #   hot-plug acceptance suites (assemble-env.sh + drivers + fixtures)
-│   ├── tests/                      #   pytest gates & live suites
-│   ├── lib/                        #   robenv + result aggregation (summary.py)
-│   └── results/                    #   run records (run-* dirs, not committed)
-├── demo/                           # tutorial dirs (00~13, see demo/README.md)
-├── docs/                           # design / novelty / glossary / spatiotemporal / disclosure-log (+ timestamps)
-└── plugins/                        # dynamic plugin archive (two workflow plugins)
-```
+3. **Create a session**
+   - Pick "机器人任务" (Robot Task) → a minimal-toolset robot agent (arm_status/take_object + capability panel)
 
 ---
 
-## Current implementation overview
+# Scenario examples
 
-- **Capability repo + mount service**: grasp 1.0.0/1.1.0/1.2.0 and suction 1.0.0 (end-effector class), camera_detect 1.0.0 (sensor class); sha256 admission + kind routing before mount, runtime mount/unmount with no restart, failure rollback, same-name instances isolated by arm scope.
-- **Capability panel (the human's only write path)**: arm/perception dropdowns for assembly, reset-all and per-arm reset (including joints home), take-ball row (choose an arm or none; the message goes to the agent for execution), ball position set & display, collapse/expand.
-- **robo agent preset**: the agent only perceives `ready` and executes `take_object`, never end-effector implementation details; mounting the vision capability injects the ball position into the execution chain (blind grab → precise), unmounting falls back automatically, and vision failures fail open.
-- **Bridge contract + SDK**: tool_config / ball_position / touch_command / move_to (convergence-completing) / home_command / reset_command + /joint_state feedback (joints/tools/ball/ee).
-- **Evaluation**: pytest gates + bridge live suite + /tmp isolated driver suites (see eval/tests/README.zh.md).
-- **Known boundaries**: mount records are process memory — re-mount in the panel after a DSH-side restart; the panel write path is unauthenticated, targeting a single-user trusted environment (see design §7.11/§12).
+## Create a session
 
-## Verified environment
+Click "机器人任务" (Robot Task) to create a minimal-toolset session. The in-session agent has exactly two robot tools: `arm_status` (perceive whether an arm has a usable end-effector) and `take_object` (have the arm take the object).
 
-- DSH: Cordis `4.0.1`, `@deepseek-ai/dsh-scope` `0.1.0-rc.7` (the core mechanisms rely on their scope/lifecycle APIs; pre-release upstream makes no compatibility promise — re-check against the runtime `cordis_inspect` after upgrades).
-- ROS2 Humble + rosbridge_server; MuJoCo/roslibpy/numpy live in the project venv `/root/venvs/robo`.
+![Create a session](docs/assets/创建会话.png)
 
----
+## Web capability panel
 
-## Demo learning path (DSH first, robotics later)
+The red-outlined area is the robot capability panel: mount different end-effector plugins and the vision sensor.
 
-Core logic: **learn DSH (including AI coding) first, then use DSH to accelerate the robotics part, and finally tie both together with hot-plugging.**
+Top-down layout:
+- **Actions row**: refresh | reset all | reset arm A | reset arm B | collapse (one row when collapsed)
+- **Arm rows**: a dropdown per arm ("no assembly" / each end-effector version), with the physical tip state at the end
+- **Perception row**: dropdown ("no assembly" / camera_detect and other sensor capabilities)
+- **Take-ball row**: choose "any arm / arm A / arm B" + "take the ball" (sends the message to the agent, which decides and executes)
+- **Ball row**: current ball position + x/y inputs + "set" (the ball moves immediately)
 
-See [`demo/README.md`](demo/README.md) for the per-demo breakdown. Order:
+![Capability panel](docs/assets/能力面板.png)
 
-1. What is an agent
-2. Better AI coding
-3. DSH concepts
-4. DSH plugin
-5. DSH spatiotemporal compositionality
-6. → only then robotics: ROS2 / rigid transforms / kinematics / trajectory control / ROS2 nodes / C++ control
-7. → finally `demo/13-hotplug` ties DSH and robotics into the flagship demo
+## Mount an end-effector
 
----
+- By clicking in the web UI you can smoothly mount different end-effector plugins
+- Arm A (deep blue), arm B (orange), gripper (teal), suction cup (magenta), no assembly (light gray)
 
-## Reliability design overview
+![Mount an end-effector](docs/assets/装配末端.gif)
 
-Mapping reliability engineering practice onto capability hot-plugging (`demo/13-hotplug` tutorial + `src/` engineering):
+## Plugin switching & grabbing the ball
 
-| Engineering practice | This project's counterpart |
-|---|---|
-| Integrity hash verification | Verify manifest / hash before mounting a capability; reject invalid ones |
-| Multi-version coexistence | One capability supports multiple coexisting versions |
-| Version swap + zero downtime | unmount old instance + mount new instance, agent-unaware |
-| Auto rollback on failure (with a brief swap window) | Auto-restore the old instance if a swap fails (best effort, explicit alert on restore failure) |
-| Pub/sub event notification | Capability add/remove broadcasts events; agent perceives via subscription |
-| Hardware-difference shielding layer (decoupling) | Capability abstraction: same-type end-effectors shadow by name; upper layers unaware |
-| Exact resource reclamation | arm-scope isolation + Cordis dispose for exact cleanup |
+- The agent only cares whether an end-effector is mounted, not how it is implemented (hardware shielding). Once mounted, sending the agent a message triggers the grab: "have arm A take the ball" → the agent calls `arm_status(A)` (ready) → `take_object(A)` (strategy inside the end-effector instance) → hit/miss result.
+- The take-ball row also supports "any arm": send "take the ball" and let the agent choose by itself.
 
-See [`docs/design.md`](docs/design.md) section 8.
+![Plugin switching & grabbing the ball](docs/assets/插件切换与抓取小球.gif)
+
+## Capability enhancement
+
+- With only grasp 1.2.0, the tip does **blind grabbing**: it moves to that arm's preset point (arm A [0.3,-0.3], arm B [0.3,0.3]); if the ball is not there, the result is "miss".
+- Mounting camera_detect on the perception slot makes the vision interceptor inject the ball position into the execution chain → the tip **precisely grabs** the actual position.
+- Unmounting the vision sensor falls back to blind grabbing; when vision data is unavailable the chain fails open and the grab flow continues.
+
+![Capability enhancement](docs/assets/插件能力增强.gif)
 
 ---
 
-## Roadmap (future work, recorded here)
+# Limitations & extensions
 
-- **Simulation realism**: future sim uses physically real suction/gripper + ball (contact detection, the ball follows the end-effector once grasped), to give "success rate" physical meaning.
-- **Evaluation extension**: automated agent vs oracle vs random evaluation.
+## Limitations
 
-## Quick start
+- To spotlight the plugin idea, the robot side is deliberately minimal: no physical contact, the grab check is a tip-ball distance threshold (0.05 m, not contact judgment); the simulated vision reads the `ball` field from the /joint_state feedback, not a real camera.
+- grasp 1.0.0/1.1.0 and suction 1.0.0 are version-swap demo versions (`touch` publish-and-return, no hit check); the vision injection chain only works with grasp 1.2.0.
+- The panel's /cap-mount write path is unauthenticated, targeting a single-user trusted environment.
 
-> Start from [`demo/00-dsh-quickstart`](demo/00-dsh-quickstart): install DSH → set the key → run the first agent; the robotics part starts at [`demo/06-ros2-mujoco-env`](demo/06-ros2-mujoco-env) with the ROS2 + MuJoCo environment.
+## Extensions
 
-## Disclosure & evidence
-
-> First public commit, FreeTSA timestamp receipts, and publication links: see [`docs/disclosure-log.md`](docs/disclosure-log.md).
+- Standard protocol & legality checks for capability loading (sha256 admission + kind routing already in place): add publisher signatures and machine-readable capability metadata.
+- Logic-vs-physics reconciliation: rebuild mount records from the physical state on panel refresh / mount-service startup (a "rebuild mounts" action).
+- Real hardware (ros2_control hardware_interface) and a real vision camera; contact judgment and the ball following the end-effector once grasped, giving "success rate" physical meaning.
+- Multi-user authentication, zero-window swap (blue-green two-phase), and automated agent evaluation (agent vs oracle vs random).

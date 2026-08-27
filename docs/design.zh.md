@@ -180,7 +180,7 @@
 | 5 | 挂载服务 | 动态 import host.js(带策略插件模块), 准备在臂上下文上挂载 |
 | 6 | 挂载服务 | 在**全部已注册的 armA 上下文**(每会话一套)上 ctx.plugin(插件) → 插件 apply 注册 manipulate 实例(同名, armA 层); fiber.await 确认激活; 失败回收并拒绝 |
 | 7 | 挂载服务 | 记录 {armA: grasp@1.2.0, 句柄}; tools/change 广播(observer 收到, 更新能力集汇报); 之后新注册的会话上下文自动补挂当前末端 |
-| 8 | 面板 host | 挂载 ok → 物理装配 set_tool(A, grasp)(sim_bridge 臂 A 末端变红; 物理失败仅告警, 不回滚已成功的注册) |
+| 8 | 面板 host | 挂载 ok → 物理装配 set_tool(A, grasp)(sim_bridge 臂 A 末端变白(夹爪); 物理失败仅告警, 不回滚已成功的注册) |
 | 9 | 面板 client | 刷新状态: 臂 A 下拉框显示当前装配 grasp@1.2.0 |
 | 10 | agent | 下次 arm_status(A) = {ready: true}; take_object(A) 自动走夹取策略 |
 
@@ -250,9 +250,9 @@
 1. 场景: 双臂 + 小球, 两臂都无末端.
 2. 用户: 「**抓小球**」. agent 感知: arm_status 均为 not ready → 回复「当前没有末端执行器, 无法抓取」.
 3. 人热插拔: 在面板给臂 A 挂上 grasp 末端能力(夹取策略实例).
-4. 用户再说「**抓小球**」. agent 感知: 臂 A ready → 调 `take_object(A)` → 实例走夹取策略 → 臂 A 末端变红、移到小球(抓取).
+4. 用户再说「**抓小球**」. agent 感知: 臂 A ready → 调 `take_object(A)` → 实例走夹取策略 → 臂 A 末端变白(夹爪)、移到小球(抓取).
 5. 人热插拔: 在面板把臂 A 的 grasp 换成 suction(卸载旧实例、挂载吸附策略实例).
-6. 用户第三次说「**抓小球**」. agent 感知: 臂 A 仍 ready → 再调 `take_object(A)` → 实例已换成吸附策略 → 末端变蓝、移到小球(吸附).
+6. 用户第三次说「**抓小球**」. agent 感知: 臂 A 仍 ready → 再调 `take_object(A)` → 实例已换成吸附策略 → 末端变黑(吸盘)、移到小球(吸附).
 
 > 核心看点: **同一句命令、同一个 API, agent 三次给出与末端状态匹配的结果**;
 > 切换全程 agent 无感、机器人不停机, 且 agent 从头到尾不知道「夹爪/吸盘」这些实现细节.
@@ -342,7 +342,7 @@ ros-hotplug-by-dsh/
 │   ├── lib/                        #   robenv + 结果聚合(summary.py)
 │   └── results/                    #   评测记录(run-* 目录, 不入库)
 ├── demo/                           # 教学目录(00~13, 见 demo/README.zh.md)
-├── docs/                           # design / novelty / glossary / 时空组合性 / disclosure-log(+ timestamps)
+├── docs/                           # design / novelty / glossary / 时空组合性 / disclosure-log(+ timestamps / assets 演示 gif)
 └── plugins/                        # 动态插件归档(两个工作流插件)
 ```
 
