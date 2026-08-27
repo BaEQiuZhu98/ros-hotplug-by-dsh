@@ -1,3 +1,5 @@
+[English](disclosure-log.md) | 中文
+
 # Disclosure Log — 披露与留证清单
 
 > 目的：记录「率先公开」的可验证证据链，作为优先权主张的时间锚。

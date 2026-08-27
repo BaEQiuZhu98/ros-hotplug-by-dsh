@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/01 — What is an agent
 
 ## What you learn

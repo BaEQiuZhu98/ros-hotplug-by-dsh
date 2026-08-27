@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/13 — Capability hot-plugging ★ flagship
 
 ## Build the intuition first (start here if new)

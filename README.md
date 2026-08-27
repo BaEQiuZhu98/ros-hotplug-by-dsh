@@ -1,4 +1,8 @@
+[中文](README.zh.md) | English
+
 # ros-hotplug-by-dsh
+
+English | [中文](README.zh.md)
 
 > **One-liner**: Be the first to apply DeepSeek Harness (DSH) *spatiotemporal compositionality* to **hot-plugging of embodied-robot capabilities**, with a **reproducible implementation + tutorial-grade demos**.
 

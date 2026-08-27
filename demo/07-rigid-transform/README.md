@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/07 — Rigid transforms
 
 ## Build the intuition first (start here if new)

@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/06 — ROS2 + MuJoCo environment setup
 
 ## What you learn

@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/10 — ROS2 basics
 
 ## Build the intuition first (start here if new)

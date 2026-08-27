@@ -1,3 +1,5 @@
+[中文](disclosure-log.zh.md) | English
+
 # Disclosure Log — evidence checklist
 
 > Purpose: record the verifiable evidence chain of "first public disclosure", as the temporal anchor for the priority claim.

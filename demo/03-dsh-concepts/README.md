@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/03 — DSH core concepts: everything is a plugin
 
 ## What you learn

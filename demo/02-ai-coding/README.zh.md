@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/02 — 用 DSH 更好地 AI Coding
 
 ## 学什么

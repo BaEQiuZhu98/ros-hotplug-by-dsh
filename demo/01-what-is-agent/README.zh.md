@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/01 — Agent 是什么
 
 ## 学什么

@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/06 — ROS2 + MuJoCo 环境搭建
 
 ## 学什么

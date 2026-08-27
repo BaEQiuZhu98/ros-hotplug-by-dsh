@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/11 — C++ 控制（cpp-control）
 
 ## 先建立直觉（零基础从这里读）

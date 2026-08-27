@@ -1,3 +1,5 @@
+[中文](spatiotemporal-compositionality.zh.md) | English
+
 # DSH Spatiotemporal Compositionality — explained
 
 > This is the methodological foundation of the project and its core teaching document. Goal: turn DSH's "spatiotemporal compositionality" into a reusable mental model that transfers to robot hot-plugging.

@@ -1,3 +1,5 @@
+[中文](design.zh.md) | English
+
 # Project design document — ros-hotplug-by-dsh
 
 

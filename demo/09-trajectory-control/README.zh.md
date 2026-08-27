@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/09 — 轨迹控制（trajectory control）
 
 ## 先建立直觉（零基础从这里读）

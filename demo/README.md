@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo — Learning Path (DSH first, robotics later)
 
 > Design principle: **learn DSH (including AI coding) with minimal demos first, then use DSH to accelerate the robotics part, and finally tie both together in `13-hotplug`.** Each demo is a minimal, runnable, independently verifiable example; demos do not share code, but knowledge strictly accumulates.

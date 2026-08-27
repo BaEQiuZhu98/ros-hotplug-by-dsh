@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/07 — 刚体变换（rigid transform）
 
 ## 先建立直觉（零基础从这里读）

@@ -1,3 +1,5 @@
+[English](spatiotemporal-compositionality.md) | 中文
+
 # DSH 时空组合性（Spatiotemporal Compositionality）详解
 
 > 这是本项目的方法论基石，也是教学核心文档。目标：把 DSH 的「时空组合性」讲成一个可复用、可迁移到机器人热插拔的心智模型。

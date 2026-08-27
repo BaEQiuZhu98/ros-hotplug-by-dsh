@@ -1,3 +1,5 @@
+[中文](glossary.zh.md) | English
+
 # Glossary — terms, features & concepts
 
 > Central quick-reference for the terms, features, and concepts used in this project (extracted from `spatiotemporal-compositionality`, `README`, and the design discussions). Columns: "term / one-line meaning / where it lands in the project".

@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/02 — Better AI coding with DSH
 
 ## What you learn

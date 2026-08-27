@@ -1,3 +1,5 @@
+[中文](novelty.zh.md) | English
+
 # Status-quo analysis & project highlights
 
 > Purpose: analyze the limitations of existing robot hot-plugging methods (with papers/source/architecture evidence), and state this project's highlights and claim boundary. Merged from the former `hotplug-methods`, `prior-art`, and `novelty-claim`.

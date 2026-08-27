@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/13 — 能力热插拔（hotplug）★ 旗舰
 
 ## 先建立直觉（零基础从这里读）

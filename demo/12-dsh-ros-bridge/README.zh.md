@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/12 — DSH ↔ ROS2 桥（dsh-ros-bridge）
 
 ## 先建立直觉（零基础从这里读）

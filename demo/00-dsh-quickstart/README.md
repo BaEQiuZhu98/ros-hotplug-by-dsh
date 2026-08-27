@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/00 — DSH quickstart
 
 ## What you learn

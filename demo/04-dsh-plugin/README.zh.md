@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/04 — DSH 插件(plugin)与工具(tool)
 
 ## 学什么

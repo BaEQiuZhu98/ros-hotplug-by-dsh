@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/12 — DSH ↔ ROS2 bridge
 
 ## Build the intuition first (start here if new)

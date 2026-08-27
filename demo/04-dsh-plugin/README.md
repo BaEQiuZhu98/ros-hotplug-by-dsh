@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/04 — DSH plugins & tools
 
 ## What you learn

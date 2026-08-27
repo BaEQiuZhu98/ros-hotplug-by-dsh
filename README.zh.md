@@ -1,4 +1,8 @@
+[English](README.md) | 中文
+
 # ros-hotplug-by-dsh
+
+[English](README.md) | 中文
 
 > **一句话**：率先将 DeepSeek Harness（DSH）的「时空组合性」应用于**具身机器人能力的热插拔**, 并给出**可复现实现 + 教学级 demo**.
 

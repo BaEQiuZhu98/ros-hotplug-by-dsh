@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/08 — 运动学（kinematics）
 
 ## 先建立直觉（零基础从这里读）

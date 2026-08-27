@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/03 — DSH 核心概念: 一切皆插件
 
 ## 学什么

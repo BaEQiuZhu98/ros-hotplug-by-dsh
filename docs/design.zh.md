@@ -1,3 +1,5 @@
+[English](design.md) | 中文
+
 # 项目设计文档 — ros-hotplug-by-dsh
 
 > 本文是本项目的**唯一设计文档**。

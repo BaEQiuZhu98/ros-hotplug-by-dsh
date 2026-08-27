@@ -1,3 +1,5 @@
+[中文](README.zh.md) | English
+
 # demo/08 — Kinematics
 
 ## Build the intuition first (start here if new)

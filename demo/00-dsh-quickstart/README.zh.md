@@ -1,3 +1,5 @@
+[English](README.md) | 中文
+
 # demo/00 — DSH 快速上手
 
 ## 学什么
