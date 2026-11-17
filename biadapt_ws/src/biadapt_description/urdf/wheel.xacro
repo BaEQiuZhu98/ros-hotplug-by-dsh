@@ -1,48 +1,53 @@
 <?xml version="1.0"?>
 <robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:include filename="base.xacro"/>
+    <xacro:include filename="base.xacro" />
 
-    <xacro:macro name="wheel" params="prefix reflect wheel_radius wheel_width wheel_mass joint_parent joint_origin_xyz">
+    <xacro:macro name="wheel"
+        params="prefix reflect wheel_radius wheel_width wheel_mass joint_parent joint_origin_xyz">
         <link name="${prefix}_wheel_link">
             <visual>
-                <origin xyz="${base_point}" rpy="${PI/2} 0 0"/>
+                <origin xyz="${base_point}" rpy="${PI/2} 0 0" />
                 <geometry>
-                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                    <cylinder radius="${wheel_radius}" length="${wheel_width}" />
                 </geometry>
                 <material name="blue">
-                    <color rgba="${color_dusty_blue}"/>
+                    <color rgba="${color_dusty_blue}" />
                 </material>
             </visual>
             <!-- 标记块 -->
             <visual>
-                <origin xyz="${wheel_radius * 0.8 * reflect} ${wheel_width / 2 + 0.0015} 0" rpy="0 0 0"/>
+                <origin xyz="${wheel_radius * 0.8 * reflect} ${wheel_width / 2 + 0.0015} 0"
+                    rpy="0 0 0" />
                 <geometry>
-                    <box size="0.02 0.02 0.002"/>
+                    <box size="0.02 0.02 0.002" />
                 </geometry>
                 <material name="red">
-                    <color rgba="${color_neon_magenta}"/>
+                    <color rgba="${color_neon_magenta}" />
                 </material>
             </visual>
             <collision>
-                <origin xyz="${base_point}" rpy="${PI/2} 0 0"/>
+                <origin xyz="${base_point}" rpy="${PI/2} 0 0" />
                 <geometry>
-                    <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+                    <sphere radius="${wheel_radius}" />
+                    <!-- <cylinder radius="${wheel_radius}" length="${wheel_width}" /> -->
                 </geometry>
             </collision>
             <inertial>
-                <origin xyz="${base_point}" rpy="${base_point}"/>
-                <mass value="${wheel_mass}"/>
-                <inertia ixx="${(1/12) * wheel_mass * (3 * wheel_radius * wheel_radius + wheel_width * wheel_width)}" ixy="0.0" ixz="0.0" 
-                            iyy="${(1/2) * wheel_mass * wheel_radius * wheel_radius}" iyz="0.0" 
-                            izz="${(1/12) * wheel_mass * (3 * wheel_radius * wheel_radius + wheel_width * wheel_width)}"/>
+                <origin xyz="${base_point}" rpy="${base_point}" />
+                <mass value="${wheel_mass}" />
+                <inertia
+                    ixx="${(1/12) * wheel_mass * (3 * wheel_radius * wheel_radius + wheel_width * wheel_width)}"
+                    ixy="0.0" ixz="0.0"
+                    iyy="${(1/2) * wheel_mass * wheel_radius * wheel_radius}" iyz="0.0"
+                    izz="${(1/12) * wheel_mass * (3 * wheel_radius * wheel_radius + wheel_width * wheel_width)}" />
             </inertial>
         </link>
         <joint name="${prefix}_wheel_joint" type="continuous">
-            <parent link="${joint_parent}"/>
-            <child link="${prefix}_wheel_link"/>
-            <origin xyz="${joint_origin_xyz}" rpy="0 0 0"/>
-            <axis xyz="0 1 0"/>
-            <dynamics damping="0.5" friction="0.1"/>
+            <parent link="${joint_parent}" />
+            <child link="${prefix}_wheel_link" />
+            <origin xyz="${joint_origin_xyz}" rpy="0 0 0" />
+            <axis xyz="0 1 0" />
+            <dynamics damping="0.01" friction="0.1" />
         </joint>
         <gazebo reference="${prefix}_wheel_link">
             <mu1>1.0</mu1>
@@ -51,53 +56,74 @@
         </gazebo>
     </xacro:macro>
 
-    <xacro:macro name="caster_wheel" params="prefix caster_wheel_radius caster_wheel_mass joint_parent joint_origin_xyz">
+    <xacro:macro name="caster_wheel"
+        params="prefix caster_wheel_radius caster_wheel_mass joint_parent joint_origin_xyz">
         <link name="${prefix}_caster_wheel_link">
             <visual>
-                <origin xyz="${base_point}" rpy="${base_point}"/>
+                <origin xyz="${base_point}" rpy="${base_point}" />
                 <geometry>
-                    <sphere radius="${caster_wheel_radius}"/>
+                    <sphere radius="${caster_wheel_radius}" />
                 </geometry>
                 <material name="blue">
-                    <color rgba="${color_dusty_blue}"/>
+                    <color rgba="${color_dusty_blue}" />
                 </material>
             </visual>
             <!-- 标记块 -->
             <visual>
-                <origin xyz="${caster_wheel_radius} 0 0" rpy="${base_point}"/>
+                <origin xyz="${caster_wheel_radius} 0 0" rpy="${base_point}" />
                 <geometry>
-                    <box size="0.015 0.015 0.015"/>
+                    <box size="0.015 0.015 0.015" />
                 </geometry>
                 <material name="red">
-                    <color rgba="${color_neon_magenta}"/>
+                    <color rgba="${color_neon_magenta}" />
                 </material>
             </visual>
             <collision>
-                <origin xyz="${base_point}" rpy="${base_point}"/>
+                <origin xyz="${base_point}" rpy="${base_point}" />
                 <geometry>
-                    <sphere radius="${caster_wheel_radius}"/>
+                    <sphere radius="${caster_wheel_radius}" />
                 </geometry>
             </collision>
             <collision>
-                <origin xyz="${caster_wheel_radius} 0 0" rpy="${base_point}"/>
+                <origin xyz="${caster_wheel_radius} 0 0" rpy="${base_point}" />
                 <geometry>
-                    <box size="0.015 0.015 0.015"/>
+                    <box size="0.015 0.015 0.015" />
                 </geometry>
             </collision>
             <inertial>
-                <origin xyz="${base_point}" rpy="${base_point}"/>
-                <mass value="${caster_wheel_mass}"/>
-                <inertia ixx="${(2/5)*caster_wheel_mass*caster_wheel_radius*caster_wheel_radius}" ixy="0.0" ixz="0.0" 
-                         iyy="${(2/5)*caster_wheel_mass*caster_wheel_radius*caster_wheel_radius}" iyz="0.0" 
-                         izz="${(2/5)*caster_wheel_mass*caster_wheel_radius*caster_wheel_radius}"/>
+                <origin xyz="${base_point}" rpy="${base_point}" />
+                <mass value="${caster_wheel_mass}" />
+                <inertia ixx="${(2/5)*caster_wheel_mass*caster_wheel_radius*caster_wheel_radius}"
+                    ixy="0.0" ixz="0.0"
+                    iyy="${(2/5)*caster_wheel_mass*caster_wheel_radius*caster_wheel_radius}"
+                    iyz="0.0"
+                    izz="${(2/5)*caster_wheel_mass*caster_wheel_radius*caster_wheel_radius}" />
             </inertial>
         </link>
         <joint name="${prefix}_caster_joint" type="continuous">
-            <parent link="${joint_parent}"/>
-            <child link="${prefix}_caster_wheel_link"/>
-            <origin xyz="${joint_origin_xyz}" rpy="0 0 0"/>
-            <axis xyz="0 1 0"/>
-            <dynamics damping="0.1" friction="0.0"/>
+            <parent link="${joint_parent}" />
+            <child link="${prefix}_caster_wheel_link" />
+            <origin xyz="${joint_origin_xyz}" rpy="0 0 0" />
+            <axis xyz="0 1 0" />
+            <dynamics damping="0.1" friction="0.0" />
         </joint>
+    </xacro:macro>
+
+    <xacro:macro name="wheel_gazebo"
+        params="prefix_left prefix_right wheel_separation wheel_radius">
+        <gazebo>
+            <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+                <left_joint>${prefix_left}_wheel_joint</left_joint>
+                <right_joint>${prefix_right}_wheel_joint</right_joint>
+                <wheel_separation>${wheel_separation}</wheel_separation>
+                <wheel_radius>${wheel_radius}</wheel_radius>
+                <topic>/cmd_vel</topic>
+                <odom_topic>/odom</odom_topic>
+                <tf_topic>/tf</tf_topic>
+                <frame_id>odom</frame_id>
+                <child_frame_id>base_footprint</child_frame_id>
+                <odom_publish_frequency>30</odom_publish_frequency>
+            </plugin>
+        </gazebo>
     </xacro:macro>
 </robot>

@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:include filename="base.xacro"/>
-    <xacro:include filename="body.xacro"/>
-    <xacro:include filename="wheel.xacro"/>
+    <xacro:include filename="base.xacro" />
+    <xacro:include filename="body.xacro" />
+    <xacro:include filename="wheel.xacro" />
 
     <xacro:property name="base_size_length" value="0.5" />
     <xacro:property name="base_size_width" value="0.4" />
@@ -19,19 +19,17 @@
     <xacro:property name="wheel_mass" value="1" />
     <xacro:property name="wheel_joint_parent" value="base_link" />
 
-    <xacro:property name="caster_wheel_radius" value="0.03"/>
-    <xacro:property name="caster_wheel_mass" value="0.2"/>
-    <xacro:property name="caster_wheel_joint_parent" value="base_link"/>
+    <xacro:property name="caster_wheel_radius" value="0.03" />
+    <xacro:property name="caster_wheel_mass" value="0.2" />
+    <xacro:property name="caster_wheel_joint_parent" value="base_link" />
 
-    <link name="world"/>
-
-    <xacro:base 
+    <xacro:base
         base_size_length="${base_size_length}"
         base_size_width="${base_size_width}"
         base_size_height="${base_size_height}"
         base_mass="${base_mass}"
-        joint_parent="world" />
-    
+        above_ground="${base_size_height/2 + wheel_radius}" />
+
     <xacro:torso
         torso_size_length="${torso_size_length}"
         torso_size_width="${torso_size_width}"
@@ -57,10 +55,17 @@
         joint_parent="${wheel_joint_parent}"
         joint_origin_xyz="${-base_size_length/2+wheel_radius} ${-base_size_width/2} ${-base_size_height/2}" />
 
+    <xacro:wheel_gazebo
+        prefix_left="left"
+        prefix_right="right"
+        wheel_separation="${base_size_width}"
+        wheel_radius="${wheel_radius}" />
+    
     <xacro:caster_wheel
         prefix="front"
         caster_wheel_radius="${caster_wheel_radius}"
         caster_wheel_mass="${caster_wheel_mass}"
         joint_parent="${caster_wheel_joint_parent}"
-        joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2}" />
+        joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2 - wheel_radius + caster_wheel_radius}" />
+
 </robot>

@@ -36,7 +36,7 @@
     <!-- 暗紫黑（深夜机甲风） -->
     <xacro:property name="color_dark_purple" value="0.2 0.1 0.25 1.0" />
 
-    <xacro:property name="base_point" value="0 0 0"/>
+    <xacro:property name="base_point" value="0 0 0" />
 
     <xacro:property name="PI" value="3.141592653589793" />
 </robot>
