@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="base.xacro"/>
+    <xacro:include filename="body.xacro"/>
+    <xacro:include filename="wheel.xacro"/>
+
+    <xacro:property name="base_size_length" value="0.5" />
+    <xacro:property name="base_size_width" value="0.4" />
+    <xacro:property name="base_size_height" value="0.12" />
+    <xacro:property name="base_mass" value="2" />
+
+    <xacro:property name="torso_size_length" value="0.3" />
+    <xacro:property name="torso_size_width" value="0.3" />
+    <xacro:property name="torso_size_height" value="0.5" />
+    <xacro:property name="torso_mass" value="6" />
+
+    <xacro:property name="wheel_radius" value="0.075" />
+    <xacro:property name="wheel_width" value="0.03" />
+    <xacro:property name="wheel_mass" value="1" />
+    <xacro:property name="wheel_joint_parent" value="base_link" />
+
+    <xacro:property name="caster_wheel_radius" value="0.03"/>
+    <xacro:property name="caster_wheel_mass" value="0.2"/>
+    <xacro:property name="caster_wheel_joint_parent" value="base_link"/>
+
+    <link name="world"/>
+
+    <xacro:base 
+        base_size_length="${base_size_length}"
+        base_size_width="${base_size_width}"
+        base_size_height="${base_size_height}"
+        base_mass="${base_mass}"
+        joint_parent="world" />
+    
+    <xacro:torso
+        torso_size_length="${torso_size_length}"
+        torso_size_width="${torso_size_width}"
+        torso_size_height="${torso_size_height}"
+        torso_mass="${torso_mass}"
+        joint_origin_xyz="0 0 ${base_size_height/2 + torso_size_height/2}" />
+
+    <xacro:wheel
+        prefix="left"
+        reflect="1"
+        wheel_radius="${wheel_radius}"
+        wheel_width="${wheel_width}"
+        wheel_mass="${wheel_mass}"
+        joint_parent="${wheel_joint_parent}"
+        joint_origin_xyz="${-base_size_length/2+wheel_radius} ${base_size_width/2} ${-base_size_height/2}" />
+
+    <xacro:wheel
+        prefix="right"
+        reflect="-1"
+        wheel_radius="${wheel_radius}"
+        wheel_width="${wheel_width}"
+        wheel_mass="${wheel_mass}"
+        joint_parent="${wheel_joint_parent}"
+        joint_origin_xyz="${-base_size_length/2+wheel_radius} ${-base_size_width/2} ${-base_size_height/2}" />
+
+    <xacro:caster_wheel
+        prefix="front"
+        caster_wheel_radius="${caster_wheel_radius}"
+        caster_wheel_mass="${caster_wheel_mass}"
+        joint_parent="${caster_wheel_joint_parent}"
+        joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2}" />
+</robot>

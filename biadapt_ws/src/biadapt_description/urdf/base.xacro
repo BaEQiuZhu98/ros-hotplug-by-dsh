@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- UR 机械臂经典白（略带蓝调） -->
+    <xacro:property name="color_ur_white" value="0.94 0.94 0.96 1.0" />
+
+    <!-- KUKA 机械臂橙（活力醒目） -->
+    <xacro:property name="color_kuka_orange" value="1.0 0.42 0.0 1.0" />
+
+    <!-- 法拉利红（亮眼跑车质感） -->
+    <xacro:property name="color_ferrari_red" value="0.9 0.1 0.1 1.0" />
+
+    <!-- 工业警示黄（常用于底盘或防撞条） -->
+    <xacro:property name="color_industrial_yellow" value="1.0 0.75 0.0 1.0" />
+
+    <!-- 钛银灰（金属质感底盘） -->
+    <xacro:property name="color_titanium_grey" value="0.53 0.55 0.57 1.0" />
+
+    <!-- 雾霾蓝（高级感辅色） -->
+    <xacro:property name="color_dusty_blue" value="0.45 0.55 0.65 1.0" />
+
+    <!-- 森林绿（沉稳暗绿） -->
+    <xacro:property name="color_forest_green" value="0.13 0.35 0.25 1.0" />
+
+    <!-- 碳纤维黑（哑光黑） -->
+    <xacro:property name="color_carbon_black" value="0.15 0.15 0.15 1.0" />
+
+    <!-- 奶白/象牙白 -->
+    <xacro:property name="color_ivory_white" value="0.96 0.95 0.88 1.0" />
+
+    <!-- 赛博青（高饱和发光感） -->
+    <xacro:property name="color_cyber_cyan" value="0.0 0.9 1.0 1.0" />
+
+    <!-- 霓虹洋红 -->
+    <xacro:property name="color_neon_magenta" value="1.0 0.0 0.6 1.0" />
+
+    <!-- 暗紫黑（深夜机甲风） -->
+    <xacro:property name="color_dark_purple" value="0.2 0.1 0.25 1.0" />
+
+    <xacro:property name="base_point" value="0 0 0"/>
+
+    <xacro:property name="PI" value="3.141592653589793" />
+</robot>

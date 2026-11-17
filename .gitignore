@@ -1,2 +1,7 @@
 .vscode
 doc/.myfile
+build
+install
+log
+*tmp*
+*TMP*
