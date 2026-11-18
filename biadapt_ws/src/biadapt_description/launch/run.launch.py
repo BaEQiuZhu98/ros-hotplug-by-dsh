@@ -34,11 +34,11 @@ def generate_launch_description():
         'run_type', default_value='rviz',
     )
     launch_dir = os.path.join(pkg_biadapt_desc, "launch")
-    run_type_value = str(ParameterValue(LaunchConfiguration('run_type'), value_type=str))
     run_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             launch_dir, '/', LaunchConfiguration('run_type'), '.launch.py',
         ]),
+        launch_arguments={'use_sim_time': LaunchConfiguration('use_sim_time')}.items()
     )
 
     return LaunchDescription([

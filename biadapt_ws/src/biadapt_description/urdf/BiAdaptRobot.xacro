@@ -60,7 +60,7 @@
         prefix_right="right"
         wheel_separation="${base_size_width}"
         wheel_radius="${wheel_radius}" />
-    
+
     <xacro:caster_wheel
         prefix="front"
         caster_wheel_radius="${caster_wheel_radius}"
@@ -68,4 +68,11 @@
         joint_parent="${caster_wheel_joint_parent}"
         joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2 - wheel_radius + caster_wheel_radius}" />
 
+    <gazebo>
+        <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+            <topic>/joint_state</topic>
+            <update_rate>50</update_rate>
+        </plugin>
+    </gazebo>
 </robot>
