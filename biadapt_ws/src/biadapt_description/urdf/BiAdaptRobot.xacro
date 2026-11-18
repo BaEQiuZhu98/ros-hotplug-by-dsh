@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:include filename="base.xacro" />
-    <xacro:include filename="body.xacro" />
-    <xacro:include filename="wheel.xacro" />
+    <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/body.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/wheel.xacro" />
 
     <xacro:property name="base_size_length" value="0.5" />
     <xacro:property name="base_size_width" value="0.4" />
@@ -11,7 +12,7 @@
 
     <xacro:property name="torso_size_length" value="0.3" />
     <xacro:property name="torso_size_width" value="0.3" />
-    <xacro:property name="torso_size_height" value="0.5" />
+    <xacro:property name="torso_size_height" value="0.8" />
     <xacro:property name="torso_mass" value="6" />
 
     <xacro:property name="wheel_radius" value="0.075" />
@@ -23,6 +24,7 @@
     <xacro:property name="caster_wheel_mass" value="0.2" />
     <xacro:property name="caster_wheel_joint_parent" value="base_link" />
 
+    <!-- 底盘 -->
     <xacro:base
         base_size_length="${base_size_length}"
         base_size_width="${base_size_width}"
@@ -30,6 +32,7 @@
         base_mass="${base_mass}"
         above_ground="${base_size_height/2 + wheel_radius}" />
 
+    <!-- 躯干 -->
     <xacro:torso
         torso_size_length="${torso_size_length}"
         torso_size_width="${torso_size_width}"
@@ -37,6 +40,7 @@
         torso_mass="${torso_mass}"
         joint_origin_xyz="0 0 ${base_size_height/2 + torso_size_height/2}" />
 
+    <!-- 驱动轮 左 + 右 -->
     <xacro:wheel
         prefix="left"
         reflect="1"
@@ -61,6 +65,7 @@
         wheel_separation="${base_size_width}"
         wheel_radius="${wheel_radius}" />
 
+    <!-- 从动轮(万向轮) -->
     <xacro:caster_wheel
         prefix="front"
         caster_wheel_radius="${caster_wheel_radius}"
@@ -68,6 +73,41 @@
         joint_parent="${caster_wheel_joint_parent}"
         joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2 - wheel_radius + caster_wheel_radius}" />
 
+    <!-- 双臂 左 + 右 -->
+    <xacro:property name="ur_type" value="ur3" />
+    <xacro:property name="joint_limit_params"
+        value="$(find ur_description)/config/${ur_type}/joint_limits.yaml" />
+    <xacro:property name="kinematics_params"
+        value="$(find ur_description)/config/${ur_type}/default_kinematics.yaml" />
+    <xacro:property name="physical_params"
+        value="$(find ur_description)/config/${ur_type}/physical_parameters.yaml" />
+    <xacro:property name="visual_params"
+        value="$(find ur_description)/config/${ur_type}/visual_parameters.yaml" />
+    <xacro:ur_robot
+        name="left_arm"
+        tf_prefix="left_"
+        parent="torso_link"
+        joint_limits_parameters_file="${joint_limit_params}"
+        kinematics_parameters_file="${kinematics_params}"
+        physical_parameters_file="${physical_params}"
+        visual_parameters_file="${visual_params}"
+    >
+        <origin xyz="0 ${torso_size_width/2} ${torso_size_height/4}" rpy="0 ${PI/2} ${PI/2}" />
+    </xacro:ur_robot>
+
+    <xacro:ur_robot
+        name="right_arm"
+        tf_prefix="right_"
+        parent="torso_link"
+        joint_limits_parameters_file="${joint_limit_params}"
+        kinematics_parameters_file="${kinematics_params}"
+        physical_parameters_file="${physical_params}"
+        visual_parameters_file="${visual_params}"
+    >
+        <origin xyz="0 ${-torso_size_width/2} ${torso_size_height/4}" rpy="0 ${PI/2} ${-PI/2}" />
+    </xacro:ur_robot>
+
+    <!-- 在gazebo中发布joint_state -->
     <gazebo>
         <plugin filename="gz-sim-joint-state-publisher-system"
             name="gz::sim::systems::JointStatePublisher">

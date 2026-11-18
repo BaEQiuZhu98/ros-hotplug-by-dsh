@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:include filename="base.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
 
     <xacro:macro name="base"
         params="base_size_length base_size_width base_size_height base_mass above_ground">
