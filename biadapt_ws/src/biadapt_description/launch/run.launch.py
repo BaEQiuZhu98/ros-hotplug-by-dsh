@@ -9,14 +9,14 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.parameter_descriptions import ParameterValue
+from launch.conditions import IfCondition
 
 def generate_launch_description():
     pkg_biadapt_desc = get_package_share_directory('biadapt_description')
     xacro_path = os.path.join(pkg_biadapt_desc, 'urdf', 'BiAdaptRobot.xacro')
     robot_description = xacro.process_file(xacro_path).toxml()
     declare_use_sim_time_cmd = DeclareLaunchArgument(
-        'use_sim_time', default_value='False',
+        'use_sim_time', default_value='True',
     )
 
     params = {
@@ -30,20 +30,33 @@ def generate_launch_description():
         parameters=[params],
     )
 
-    declare_run_type_cmd = DeclareLaunchArgument(
-        'run_type', default_value='rviz',
-    )
     launch_dir = os.path.join(pkg_biadapt_desc, "launch")
-    run_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            launch_dir, '/', LaunchConfiguration('run_type'), '.launch.py',
-        ]),
+
+    declare_run_rviz_cmd = DeclareLaunchArgument(
+        'run_rviz', default_value='True',
+    )
+    run_rviz = LaunchConfiguration('run_rviz')
+    run_rviz_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'rviz.launch.py')),
+        condition=IfCondition(run_rviz),
+        launch_arguments={'use_sim_time': LaunchConfiguration('use_sim_time')}.items()
+    )
+
+    declare_run_gazebo_cmd = DeclareLaunchArgument(
+        'run_gazebo', default_value='True',
+    )
+    run_gazebo = LaunchConfiguration('run_gazebo')
+    run_gazebo_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(launch_dir, 'gazebo.launch.py')),
+        condition=IfCondition(run_gazebo),
         launch_arguments={'use_sim_time': LaunchConfiguration('use_sim_time')}.items()
     )
 
     return LaunchDescription([
         declare_use_sim_time_cmd,
         node_robot_state_publisher,
-        declare_run_type_cmd,
-        run_cmd,
+        declare_run_rviz_cmd,
+        run_rviz_cmd,
+        declare_run_gazebo_cmd,
+        run_gazebo_cmd,
     ])

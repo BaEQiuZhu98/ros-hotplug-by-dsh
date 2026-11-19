@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
+
+    <xacro:macro name="gpu_lidar" params="prefix gazebo_ref pose gz_frame_id">
+        <gazebo reference="${gazebo_ref}">
+            <sensor name="${prefix}_gpu_lidar" type="gpu_lidar">
+                <always_on>true</always_on>
+                <visualize>true</visualize>
+                <pose>${pose}</pose>
+                <update_rate>5</update_rate>
+                <topic>/scan</topic>
+                <gz_frame_id>${gz_frame_id}</gz_frame_id>
+                <lidar>
+                    <scan>
+                        <horizontal>
+                            <samples>360</samples>
+                            <resolution>1.000000</resolution>
+                            <min_angle>0.000000</min_angle>
+                            <max_angle>${PI*2}</max_angle>
+                        </horizontal>
+                    </scan>
+                    <range>
+                        <min>0.15</min>
+                        <max>20.0</max>
+                        <resolution>0.015</resolution>
+                    </range>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0.0</mean>
+                        <stddev>0.01</stddev>
+                    </noise>
+                </lidar>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:macro name="rgbd_camera" params="prefix gazebo_ref pose gz_frame_id">
+        <gazebo reference="${gazebo_ref}">
+            <sensor name="${prefix}_rgbd_camera" type="rgbd_camera">
+                <always_on>true</always_on>
+                <visualize>true</visualize>
+                <pose>${pose}</pose>
+                <update_rate>5</update_rate>
+                <topic>/rgbd_camera</topic>
+                <gz_frame_id>${gz_frame_id}</gz_frame_id>
+                <enable_metrics>true</enable_metrics>
+                <camera>
+                    <horizontal_fov>1.047</horizontal_fov>
+                    <image>
+                        <width>320</width>
+                        <height>240</height>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>100</far>
+                    </clip>
+                </camera>
+            </sensor>
+        </gazebo>
+    </xacro:macro>
+</robot>

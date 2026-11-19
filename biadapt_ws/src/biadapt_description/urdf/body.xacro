@@ -24,12 +24,11 @@
             <inertial>
                 <origin xyz="${base_point}" rpy="${base_point}" />
                 <mass value="${base_mass}" />
-                <inertia
-                    ixx="${base_mass*(base_size_width*base_size_width+base_size_height*base_size_height)/12}"
-                    ixy="0.0" ixz="0.0"
-                    iyy="${base_mass*(base_size_length*base_size_length+base_size_height*base_size_height)/12}"
-                    iyz="0.0"
-                    izz="${base_mass*(base_size_length*base_size_length+base_size_width*base_size_width)/12}" />
+                <xacro:box_inertia
+                    x="${base_size_length}"
+                    y="${base_size_width}"
+                    z="${base_size_height}"
+                    m="${base_mass}" />
             </inertial>
         </link>
         <joint name="base_joint" type="fixed">
@@ -44,13 +43,13 @@
         </gazebo>
     </xacro:macro>
 
-    <xacro:macro name="torso"
-        params="torso_size_length torso_size_width torso_size_height torso_mass joint_origin_xyz">
-        <link name="torso_link">
+    <xacro:macro name="box"
+        params="prefix box_size_length box_size_width box_size_height box_mass joint_parent joint_origin_xyz">
+        <link name="${prefix}_link">
             <visual>
                 <origin xyz="${base_point}" rpy="${base_point}" />
                 <geometry>
-                    <box size="${torso_size_length} ${torso_size_width} ${torso_size_height}" />
+                    <box size="${box_size_length} ${box_size_width} ${box_size_height}" />
                 </geometry>
                 <material name="grey">
                     <color rgba="${color_titanium_grey}" />
@@ -59,26 +58,25 @@
             <collision>
                 <origin xyz="${base_point}" rpy="${base_point}" />
                 <geometry>
-                    <box size="${torso_size_length} ${torso_size_width} ${torso_size_height}" />
+                    <box size="${box_size_length} ${box_size_width} ${box_size_height}" />
                 </geometry>
             </collision>
             <inertial>
                 <origin xyz="${base_point}" rpy="${base_point}" />
-                <mass value="${torso_mass}" />
-                <inertia
-                    ixx="${torso_mass*(torso_size_width*torso_size_width+torso_size_height*torso_size_height)/12}"
-                    ixy="0.0" ixz="0.0"
-                    iyy="${torso_mass*(torso_size_length*torso_size_length+torso_size_height*torso_size_height)/12}"
-                    iyz="0.0"
-                    izz="${torso_mass*(torso_size_length*torso_size_length+torso_size_width*torso_size_width)/12}" />
+                <mass value="${box_mass}" />
+                <xacro:box_inertia
+                    x="${box_size_length}"
+                    y="${box_size_width}"
+                    z="${box_size_height}"
+                    m="${box_mass}" />
             </inertial>
         </link>
-        <joint name="torso_joint" type="fixed">
-            <parent link="base_link" />
-            <child link="torso_link" />
+        <joint name="${prefix}_joint" type="fixed">
+            <parent link="${joint_parent}" />
+            <child link="${prefix}_link" />
             <origin xyz="${joint_origin_xyz}" rpy="0 0 0" />
         </joint>
-        <gazebo reference="torso_link">
+        <gazebo reference="${prefix}_link">
             <material>Gazebo/Grey</material>
             <mu1>0.8</mu1>
             <mu2>0.8</mu2>

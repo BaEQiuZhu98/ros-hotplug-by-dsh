@@ -39,4 +39,13 @@
     <xacro:property name="base_point" value="0 0 0" />
 
     <xacro:property name="PI" value="3.141592653589793" />
+
+    <xacro:macro name="box_inertia" params="x y z m">
+        <inertia
+            ixx="${m*(y*y+z*z)/12}"
+            ixy="0.0" ixz="0.0"
+            iyy="${m*(x*x+z*z)/12}"
+            iyz="0.0"
+            izz="${m*(x*x+y*y)/12}" />
+    </xacro:macro>
 </robot>

@@ -13,12 +13,14 @@ def generate_launch_description():
         'use_sim_time', default_value='False',
     )
 
+    pkg_biadapt_desc = get_package_share_directory('biadapt_description')
+    world_sdf = os.path.join(pkg_biadapt_desc, 'sdf', 'biadapt_world.sdf')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
         launch_arguments={
-            'gz_args': '-r empty.sdf'
+            'gz_args': f"-r {world_sdf}"
         }.items(),
     )
 
@@ -38,6 +40,11 @@ def generate_launch_description():
             '/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
             '/clock@rosgraph_msgs/msg/Clock@gz.msgs.Clock',
             '/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
+            '/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
+            '/rgbd_camera/image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/rgbd_camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/rgbd_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked',
+            '/rgbd_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
         ],
         remappings = [('/joint_state', '/joint_states')],
         output='screen',

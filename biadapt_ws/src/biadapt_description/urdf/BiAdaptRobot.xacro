@@ -4,6 +4,7 @@
     <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/body.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/wheel.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/sensor.xacro" />
 
     <xacro:property name="base_size_length" value="0.5" />
     <xacro:property name="base_size_width" value="0.4" />
@@ -15,14 +16,29 @@
     <xacro:property name="torso_size_height" value="0.8" />
     <xacro:property name="torso_mass" value="6" />
 
+    <xacro:property name="head_size_length" value="0.2" />
+    <xacro:property name="head_size_width" value="0.2" />
+    <xacro:property name="head_size_height" value="0.1" />
+    <xacro:property name="head_mass" value="1" />
+
     <xacro:property name="wheel_radius" value="0.075" />
     <xacro:property name="wheel_width" value="0.03" />
     <xacro:property name="wheel_mass" value="1" />
     <xacro:property name="wheel_joint_parent" value="base_link" />
-
+    
     <xacro:property name="caster_wheel_radius" value="0.03" />
     <xacro:property name="caster_wheel_mass" value="0.2" />
     <xacro:property name="caster_wheel_joint_parent" value="base_link" />
+
+    <xacro:property name="ur_type" value="ur3" />
+    <xacro:property name="joint_limit_params"
+        value="$(find ur_description)/config/${ur_type}/joint_limits.yaml" />
+    <xacro:property name="kinematics_params"
+        value="$(find ur_description)/config/${ur_type}/default_kinematics.yaml" />
+    <xacro:property name="physical_params"
+        value="$(find ur_description)/config/${ur_type}/physical_parameters.yaml" />
+    <xacro:property name="visual_params"
+        value="$(find ur_description)/config/${ur_type}/visual_parameters.yaml" />
 
     <!-- 底盘 -->
     <xacro:base
@@ -33,12 +49,34 @@
         above_ground="${base_size_height/2 + wheel_radius}" />
 
     <!-- 躯干 -->
-    <xacro:torso
-        torso_size_length="${torso_size_length}"
-        torso_size_width="${torso_size_width}"
-        torso_size_height="${torso_size_height}"
-        torso_mass="${torso_mass}"
+    <xacro:box
+        prefix="torso"
+        box_size_length="${torso_size_length}"
+        box_size_width="${torso_size_width}"
+        box_size_height="${torso_size_height}"
+        box_mass="${torso_mass}"
+        joint_parent="base_link"
         joint_origin_xyz="0 0 ${base_size_height/2 + torso_size_height/2}" />
+
+    <!-- 头部 + 激光雷达 + RGB-D相机 -->
+    <xacro:box
+        prefix="head"
+        box_size_length="${head_size_length}"
+        box_size_width="${head_size_width}"
+        box_size_height="${head_size_height}"
+        box_mass="${head_mass}"
+        joint_parent="torso_link"
+        joint_origin_xyz="0 0 ${torso_size_height/2 + head_size_height/2}" />
+    <xacro:gpu_lidar
+        prefix="head"
+        gazebo_ref="head_link" 
+        pose="0 0 ${head_size_height/2} 0 0 0"
+        gz_frame_id="head_link" />
+    <xacro:rgbd_camera
+        prefix="head"
+        gazebo_ref="head_link" 
+        pose="0 0 ${head_size_height/2} 0 0 0"
+        gz_frame_id="head_link" />
 
     <!-- 驱动轮 左 + 右 -->
     <xacro:wheel
@@ -74,15 +112,6 @@
         joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2 - wheel_radius + caster_wheel_radius}" />
 
     <!-- 双臂 左 + 右 -->
-    <xacro:property name="ur_type" value="ur3" />
-    <xacro:property name="joint_limit_params"
-        value="$(find ur_description)/config/${ur_type}/joint_limits.yaml" />
-    <xacro:property name="kinematics_params"
-        value="$(find ur_description)/config/${ur_type}/default_kinematics.yaml" />
-    <xacro:property name="physical_params"
-        value="$(find ur_description)/config/${ur_type}/physical_parameters.yaml" />
-    <xacro:property name="visual_params"
-        value="$(find ur_description)/config/${ur_type}/visual_parameters.yaml" />
     <xacro:ur_robot
         name="left_arm"
         tf_prefix="left_"
