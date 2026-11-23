@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
+    <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro" />
+    <xacro:include filename="$(find ur_description)/urdf/inc/ur_joint_control.xacro" />
+
+    <xacro:arg name="initial_positions_file"
+        default="$(find ur_description)/config/initial_positions.yaml" />
+
+    <xacro:macro name="arm" params="prefix parent ur_type *origin">
+        <xacro:ur_robot
+            name="${prefix}_arm"
+            tf_prefix="${prefix}_"
+            parent="${parent}"
+            joint_limits_parameters_file="$(find ur_description)/config/${ur_type}/joint_limits.yaml"
+            kinematics_parameters_file="$(find ur_description)/config/${ur_type}/default_kinematics.yaml"
+            physical_parameters_file="$(find ur_description)/config/${ur_type}/physical_parameters.yaml"
+            visual_parameters_file="$(find ur_description)/config/${ur_type}/visual_parameters.yaml"
+        >
+            <xacro:insert_block name="origin" />
+        </xacro:ur_robot>
+    </xacro:macro>
+
+    <xacro:macro name="arm_joint_control" params="prefix">
+        <xacro:ur_joint_control_description tf_prefix="${prefix}_" />
+    </xacro:macro>
+</robot>

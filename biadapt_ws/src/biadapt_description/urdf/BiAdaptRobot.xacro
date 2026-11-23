@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/body.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/wheel.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/sensor.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/arm.xacro" />
 
     <xacro:property name="base_size_length" value="0.5" />
     <xacro:property name="base_size_width" value="0.4" />
@@ -25,20 +25,10 @@
     <xacro:property name="wheel_width" value="0.03" />
     <xacro:property name="wheel_mass" value="1" />
     <xacro:property name="wheel_joint_parent" value="base_link" />
-    
+
     <xacro:property name="caster_wheel_radius" value="0.03" />
     <xacro:property name="caster_wheel_mass" value="0.2" />
     <xacro:property name="caster_wheel_joint_parent" value="base_link" />
-
-    <xacro:property name="ur_type" value="ur3" />
-    <xacro:property name="joint_limit_params"
-        value="$(find ur_description)/config/${ur_type}/joint_limits.yaml" />
-    <xacro:property name="kinematics_params"
-        value="$(find ur_description)/config/${ur_type}/default_kinematics.yaml" />
-    <xacro:property name="physical_params"
-        value="$(find ur_description)/config/${ur_type}/physical_parameters.yaml" />
-    <xacro:property name="visual_params"
-        value="$(find ur_description)/config/${ur_type}/visual_parameters.yaml" />
 
     <!-- 底盘 -->
     <xacro:base
@@ -69,12 +59,12 @@
         joint_origin_xyz="0 0 ${torso_size_height/2 + head_size_height/2}" />
     <xacro:gpu_lidar
         prefix="head"
-        gazebo_ref="head_link" 
+        gazebo_ref="head_link"
         pose="0 0 ${head_size_height/2} 0 0 0"
         gz_frame_id="head_link" />
     <xacro:rgbd_camera
         prefix="head"
-        gazebo_ref="head_link" 
+        gazebo_ref="head_link"
         pose="0 0 ${head_size_height/2} 0 0 0"
         gz_frame_id="head_link" />
 
@@ -97,12 +87,6 @@
         joint_parent="${wheel_joint_parent}"
         joint_origin_xyz="${-base_size_length/2+wheel_radius} ${-base_size_width/2} ${-base_size_height/2}" />
 
-    <xacro:wheel_gazebo
-        prefix_left="left"
-        prefix_right="right"
-        wheel_separation="${base_size_width}"
-        wheel_radius="${wheel_radius}" />
-
     <!-- 从动轮(万向轮) -->
     <xacro:caster_wheel
         prefix="front"
@@ -112,36 +96,39 @@
         joint_origin_xyz="${base_size_length/2-caster_wheel_radius} 0 ${-base_size_height/2 - wheel_radius + caster_wheel_radius}" />
 
     <!-- 双臂 左 + 右 -->
-    <xacro:ur_robot
-        name="left_arm"
-        tf_prefix="left_"
+    <xacro:arm
+        prefix="left"
         parent="torso_link"
-        joint_limits_parameters_file="${joint_limit_params}"
-        kinematics_parameters_file="${kinematics_params}"
-        physical_parameters_file="${physical_params}"
-        visual_parameters_file="${visual_params}"
+        ur_type="ur3"
     >
         <origin xyz="0 ${torso_size_width/2} ${torso_size_height/4}" rpy="0 ${PI/2} ${PI/2}" />
-    </xacro:ur_robot>
+    </xacro:arm>
 
-    <xacro:ur_robot
-        name="right_arm"
-        tf_prefix="right_"
+    <xacro:arm
+        prefix="right"
         parent="torso_link"
-        joint_limits_parameters_file="${joint_limit_params}"
-        kinematics_parameters_file="${kinematics_params}"
-        physical_parameters_file="${physical_params}"
-        visual_parameters_file="${visual_params}"
+        ur_type="ur3"
     >
         <origin xyz="0 ${-torso_size_width/2} ${torso_size_height/4}" rpy="0 ${PI/2} ${-PI/2}" />
-    </xacro:ur_robot>
+    </xacro:arm>
 
-    <!-- 在gazebo中发布joint_state -->
+    <!-- gazebo 配置 -->
     <gazebo>
-        <plugin filename="gz-sim-joint-state-publisher-system"
-            name="gz::sim::systems::JointStatePublisher">
-            <topic>/joint_state</topic>
-            <update_rate>50</update_rate>
+        <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+            <robot_param>robot_description</robot_param>
+            <robot_param_node>robot_state_publisher</robot_param_node>
+            <parameters>$(find biadapt_description)/config/biadapt_controller.yaml</parameters>
         </plugin>
     </gazebo>
+
+    <!-- ros2_control 配置 -->
+    <ros2_control name="GazeboSimSystem" type="system">
+        <hardware>
+            <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        </hardware>
+        <xacro:wheel_joint_control prefix="left" />
+        <xacro:wheel_joint_control prefix="right" />
+        <xacro:arm_joint_control prefix="left" />
+        <xacro:arm_joint_control prefix="right" />
+    </ros2_control>
 </robot>

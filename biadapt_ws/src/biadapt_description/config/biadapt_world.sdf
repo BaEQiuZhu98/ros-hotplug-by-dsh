@@ -60,7 +60,7 @@ gz service -s /world/empty/create \
 
 -->
 <sdf version="1.6">
-  <world name="biadpt">
+  <world name="biadapt">
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
