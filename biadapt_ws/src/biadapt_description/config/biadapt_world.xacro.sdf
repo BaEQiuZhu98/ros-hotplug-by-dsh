@@ -83,13 +83,13 @@
       table_size_width="${table_size_width}"
       table_size_height="${table_size_height}"
       table_mass="${table_mass}"
-      table_pose="${table_size_width / 2 + 0.1} ${table_size_width / 2} ${table_size_height / 2} 0 0 0"
+      table_pose="5 5 ${table_size_height / 2} 0 0 0"
     />
 
     <xacro:cube
       cube_size="${cube_size}"
       cube_mass="${cube_mass}"
-      cube_pose="${table_size_width / 2 + 0.1} ${table_size_width / 2} ${table_size_height + cube_size / 2} 0 0 0"
+      cube_pose="5 5 ${table_size_height + cube_size / 2} 0 0 0"
     />
 
   </world>

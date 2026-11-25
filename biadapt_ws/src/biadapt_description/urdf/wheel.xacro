@@ -115,6 +115,11 @@
             <axis xyz="0 1 0" />
             <dynamics damping="0.1" friction="0.0" />
         </joint>
+        <gazebo reference="${prefix}_caster_wheel_link">
+            <mu1>0.0</mu1>
+            <mu2>0.0</mu2>
+            <material>Gazebo/Blue</material>
+        </gazebo>
     </xacro:macro>
 
     <xacro:macro name="wheel_gazebo"
