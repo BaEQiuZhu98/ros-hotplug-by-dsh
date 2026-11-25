@@ -20,7 +20,7 @@
 ## 三、环境事实
 
 - Ubuntu 24.04.5 LTS，ROS2 Jazzy 已安装（`/opt/ros/jazzy`）。
-- Gazebo、MuJoCo 未安装。
+- Gazebo Harmonic 8.15.0 已安装；MuJoCo 未安装。
 - Python 3.12.3。
 - GPU 不可用（纯 CPU 仿真），大模型走云端 API。
 - WSLg 可用（`DISPLAY=:0`），仿真窗口可弹窗。
