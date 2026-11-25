@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find biadapt_description)/config/base.xacro" />
+
+    <xacro:macro name="table"
+        params="table_size_length table_size_width table_size_height table_mass table_pose">
+        <model name="table">
+            <static>true</static>
+            <xacro:box
+                prefix="table"
+                box_size_length="${table_size_length}"
+                box_size_width="${table_size_width}"
+                box_size_height="${table_size_height}"
+                box_mass="${table_mass}"
+                box_pose="${table_pose}" />
+        </model>
+    </xacro:macro>
+
+    <xacro:macro name="cube" params="cube_size cube_mass cube_pose">
+        <model name="cube">
+            <xacro:box
+                prefix="cube"
+                box_size_length="${cube_size}"
+                box_size_width="${cube_size}"
+                box_size_height="${cube_size}"
+                box_mass="${cube_mass}"
+                box_pose="${cube_pose}" />
+        </model>
+    </xacro:macro>
+</sdf>

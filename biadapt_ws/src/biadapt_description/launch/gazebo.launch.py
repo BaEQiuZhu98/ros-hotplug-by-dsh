@@ -1,4 +1,5 @@
 import os
+import xacro
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -14,7 +15,12 @@ def generate_launch_description():
     )
 
     pkg_biadapt_desc = get_package_share_directory('biadapt_description')
-    world_sdf = os.path.join(pkg_biadapt_desc, 'config', 'biadapt_world.sdf')
+    xacro_path = os.path.join(pkg_biadapt_desc, 'config', 'biadapt_world.xacro.sdf')
+    robot_description = xacro.process_file(xacro_path).toxml()
+    world_sdf = '/tmp/biadapt_world.sdf'
+    with open(f"{world_sdf}", 'w', encoding='utf-8') as f:
+        f.write(robot_description)
+
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
     gz_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -57,6 +63,7 @@ def generate_launch_description():
             "diff_drive_controller",
             "left_arm_controller",
             "right_arm_controller",
+            "left_gripper_finger_l_controller",
             "--param-file",
             os.path.join(pkg_biadapt_desc, 'config', 'biadapt_controller.yaml')
         ],

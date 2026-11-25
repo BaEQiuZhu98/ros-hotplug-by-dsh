@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="debug_joint_ctrl" params="joint">
+        <gazebo>
+            <plugin filename="gz-sim-joint-position-controller-system"
+                name="gz::sim::systems::JointPositionController">
+                <joint_name>${joint}</joint_name>
+                <topic>/model/biadapt/joint/${joint}/0/cmd_pos</topic>
+                <use_velocity_commands>true</use_velocity_commands>
+                <p_gain>1.0</p_gain>
+            </plugin>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:macro name="debug_joint_ctrl_all">
+        <xacro:debug_joint_ctrl joint="left_shoulder_pan_joint" />
+        <xacro:debug_joint_ctrl joint="left_shoulder_lift_joint" />
+        <xacro:debug_joint_ctrl joint="left_elbow_joint" />
+        <xacro:debug_joint_ctrl joint="left_wrist_1_joint" />
+        <xacro:debug_joint_ctrl joint="left_wrist_2_joint" />
+        <xacro:debug_joint_ctrl joint="left_wrist_3_joint" />
+        <xacro:debug_joint_ctrl joint="right_shoulder_pan_joint" />
+        <xacro:debug_joint_ctrl joint="right_shoulder_lift_joint" />
+        <xacro:debug_joint_ctrl joint="right_elbow_joint" />
+        <xacro:debug_joint_ctrl joint="right_wrist_1_joint" />
+        <xacro:debug_joint_ctrl joint="right_wrist_2_joint" />
+        <xacro:debug_joint_ctrl joint="right_wrist_3_joint" />
+        <xacro:debug_joint_ctrl joint="left_gripper_finger_l_joint" />
+        <xacro:debug_joint_ctrl joint="right_gripper_finger_l_joint" />
+    </xacro:macro>
+</robot>

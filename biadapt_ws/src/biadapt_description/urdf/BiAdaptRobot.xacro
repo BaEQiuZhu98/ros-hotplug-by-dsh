@@ -5,6 +5,7 @@
     <xacro:include filename="$(find biadapt_description)/urdf/wheel.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/sensor.xacro" />
     <xacro:include filename="$(find biadapt_description)/urdf/arm.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/debug.xacro" />
 
     <xacro:property name="base_size_length" value="0.5" />
     <xacro:property name="base_size_width" value="0.4" />
@@ -29,6 +30,8 @@
     <xacro:property name="caster_wheel_radius" value="0.03" />
     <xacro:property name="caster_wheel_mass" value="0.2" />
     <xacro:property name="caster_wheel_joint_parent" value="base_link" />
+
+    <xacro:arg name="debug_enable" default="false" />
 
     <!-- 底盘 -->
     <xacro:base
@@ -112,6 +115,10 @@
         <origin xyz="0 ${-torso_size_width/2} ${torso_size_height/4}" rpy="0 ${PI/2} ${-PI/2}" />
     </xacro:arm>
 
+    <!-- 手指 -->
+    <xacro:gripper prefix="left" />
+    <xacro:gripper prefix="right" />
+
     <!-- gazebo 配置 -->
     <gazebo>
         <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
@@ -130,5 +137,13 @@
         <xacro:wheel_joint_control prefix="right" />
         <xacro:arm_joint_control prefix="left" />
         <xacro:arm_joint_control prefix="right" />
+        <xacro:gripper_joint_control prefix="left" />
+        <xacro:gripper_joint_control prefix="right" />
     </ros2_control>
+
+    <!-- debug配置 -->
+    <xacro:if value="$(arg debug_enable)">
+        <!-- gazebo手动控制GUI -->
+        <xacro:debug_joint_ctrl_all />
+    </xacro:if>
 </robot>

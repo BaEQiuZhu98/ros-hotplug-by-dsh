@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
     <xacro:include filename="$(find biadapt_description)/urdf/base.xacro" />
+    <xacro:include filename="$(find biadapt_description)/urdf/body.xacro" />
     <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro" />
     <xacro:include filename="$(find ur_description)/urdf/inc/ur_joint_control.xacro" />
 
@@ -23,5 +24,106 @@
 
     <xacro:macro name="arm_joint_control" params="prefix">
         <xacro:ur_joint_control_description tf_prefix="${prefix}_" />
+    </xacro:macro>
+
+    <xacro:property name="gripper_base_size_length" value="0.04" />
+    <xacro:property name="gripper_base_size_width" value="0.04" />
+    <xacro:property name="gripper_base_size_height" value="0.02" />
+    <xacro:property name="gripper_base_mass" value="0.1" />
+
+    <xacro:property name="gripper_size_length" value="0.01" />
+    <xacro:property name="gripper_size_width" value="0.03" />
+    <xacro:property name="gripper_size_height" value="0.06" />
+    <xacro:property name="gripper_mass" value="0.03" />
+
+    <xacro:macro name="gripper_single"
+        params="gripper_name gripper_size_length gripper_size_width gripper_size_height gripper_mass">
+        <link name="${gripper_name}_link">
+            <visual>
+                <origin xyz="${base_point}" rpy="${base_point}" />
+                <geometry>
+                    <box size="${gripper_size_length} ${gripper_size_width} ${gripper_size_height}" />
+                </geometry>
+                <material name="grey">
+                    <color rgba="${color_titanium_grey}" />
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="${base_point}" rpy="${base_point}" />
+                <geometry>
+                    <box size="${gripper_size_length} ${gripper_size_width} ${gripper_size_height}" />
+                </geometry>
+            </collision>
+            <inertial>
+                <origin xyz="${base_point}" rpy="${base_point}" />
+                <mass value="${gripper_mass}" />
+                <xacro:box_inertia
+                    x="${gripper_size_length}"
+                    y="${gripper_size_width}"
+                    z="${gripper_size_height}"
+                    m="${gripper_mass}" />
+            </inertial>
+        </link>
+        <gazebo reference="${gripper_name}_link">
+            <material>Gazebo/Grey</material>
+            <mu1>1</mu1>
+            <mu2>1</mu2>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:macro name="gripper" params="prefix">
+        <xacro:box
+            prefix="${prefix}_gripper_base"
+            box_size_length="${gripper_base_size_length}"
+            box_size_width="${gripper_base_size_width}"
+            box_size_height="${gripper_base_size_height}"
+            box_mass="${gripper_base_mass}"
+            joint_parent="${prefix}_tool0"
+            joint_origin_xyz="0 0 ${gripper_base_size_height}" />
+        <xacro:gripper_single
+            gripper_name="${prefix}_gripper_finger_l"
+            gripper_size_length="${gripper_size_length}"
+            gripper_size_width="${gripper_size_width}"
+            gripper_size_height="${gripper_size_height}"
+            gripper_mass="${gripper_mass}"
+        />
+        <xacro:gripper_single
+            gripper_name="${prefix}_gripper_finger_r"
+            gripper_size_length="${gripper_size_length}"
+            gripper_size_width="${gripper_size_width}"
+            gripper_size_height="${gripper_size_height}"
+            gripper_mass="${gripper_mass}"
+        />
+        <joint name="${prefix}_gripper_finger_l_joint"
+            type="prismatic">
+            <parent link="${prefix}_gripper_base_link" />
+            <child link="${prefix}_gripper_finger_l_link" />
+            <origin xyz="-${gripper_size_width + 0.02} 0 ${gripper_size_height / 2}" rpy="0 0 0" />
+            <axis xyz="1 0 0" />
+            <limit effort="20" lower="0.0" upper="0.1" velocity="0.05" />
+        </joint>
+        <joint name="${prefix}_gripper_finger_r_joint" type="fixed">
+            <parent link="${prefix}_gripper_base_link" />
+            <child link="${prefix}_gripper_finger_r_link" />
+            <origin xyz="${gripper_size_width + 0.002} 0 ${gripper_size_height / 2}" rpy="0 0 0" />
+            <axis xyz="-1 0 0" />
+            <!-- <limit effort="20" lower="0.0" upper="0.008" velocity="0.05" /> -->
+            <!-- <mimic joint="${prefix}_gripper_finger_l_joint" multiplier="-1" offset="0" /> -->
+        </joint>
+    </xacro:macro>
+
+    <xacro:macro name="gripper_joint_control" params="prefix">
+        <joint name="${prefix}_gripper_finger_l_joint">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <command_interface name="velocity" />
+            <state_interface name="velocity" />
+        </joint>
+        <!-- <joint name="${prefix}_gripper_finger_r_joint">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+            <command_interface name="velocity" />
+            <state_interface name="velocity" />
+        </joint> -->
     </xacro:macro>
 </robot>

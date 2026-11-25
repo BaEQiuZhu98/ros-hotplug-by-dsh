@@ -1,65 +1,7 @@
-<?xml version="1.0" ?>
-<!--
-  Try inserting a model:
+<?xml version="1.0"?>
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find biadapt_description)/config/object.xacro" />
 
-gz service -s /world/empty/create \
---reqtype gz.msgs.EntityFactory \
---reptype gz.msgs.Boolean \
---timeout 300 \
---req 'sdf: '\
-'"<?xml version=\"1.0\" ?>'\
-'<sdf version=\"1.6\">'\
-'<model name=\"spawned_model\">'\
-'<link name=\"link\">'\
-'<visual name=\"visual\">'\
-'<geometry><sphere><radius>1.0</radius></sphere></geometry>'\
-'</visual>'\
-'<collision name=\"visual\">'\
-'<geometry><sphere><radius>1.0</radius></sphere></geometry>'\
-'</collision>'\
-'</link>'\
-'</model>'\
-'</sdf>" '\
-'pose: {position: {z: 10}} '\
-'name: "new_name" '\
-'allow_renaming: true'
-
-  Then try deleting it:
-
-gz service -s /world/empty/remove \
---reqtype gz.msgs.Entity \
---reptype gz.msgs.Boolean \
---timeout 300 \
---req 'name: "new_name" type: MODEL'
-
-  Try inserting a light:
-
-gz service -s /world/empty/create --reqtype gz.msgs.EntityFactory --reptype gz.msgs.Boolean --timeout 300 --req 'sdf: '\
-'"<?xml version=\"1.0\" ?>'\
-'<sdf version=\"1.6\">'\
-'<light name=\"spawned_light\" type=\"directional\">'\
-'<pose>0 0 10 0.1 1.0 0</pose>'\
-'</light>'\
-'</sdf>"'
-
-  Then try deleting it:
-
-gz service -s /world/empty/remove \
---reqtype gz.msgs.Entity \
---reptype gz.msgs.Boolean \
---timeout 300 \
---req 'name: "spawned_light" type: LIGHT'
-
-  Insert a light using a message and allow_renaming:
-
-gz service -s /world/empty/create \
---reqtype gz.msgs.EntityFactory \
---reptype gz.msgs.Boolean \
---timeout 300 \
---req 'allow_renaming: true, light: {name: "spawned_light", type: 2, diffuse: {r: 1}}'
-
--->
-<sdf version="1.6">
   <world name="biadapt">
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
@@ -82,9 +24,9 @@ gz service -s /world/empty/create \
       name="gz::sim::systems::Contact">
     </plugin>
     <plugin
-    filename="gz-sim-sensors-system"
-    name="gz::sim::systems::Sensors">
-    <render_engine>ogre2</render_engine>
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
     </plugin>
 
     <light type="directional" name="sun">
@@ -127,6 +69,28 @@ gz service -s /world/empty/create \
         </visual>
       </link>
     </model>
+
+    <xacro:property name="table_size_length" value="0.2"/>
+    <xacro:property name="table_size_width" value="0.4"/>
+    <xacro:property name="table_size_height" value="0.4"/>
+    <xacro:property name="table_mass" value="10"/>
+  
+    <xacro:property name="cube_size" value="0.05"/>
+    <xacro:property name="cube_mass" value="0.01"/>
+
+    <xacro:table
+      table_size_length="${table_size_length}"
+      table_size_width="${table_size_width}"
+      table_size_height="${table_size_height}"
+      table_mass="${table_mass}"
+      table_pose="${table_size_width / 2 + 0.1} ${table_size_width / 2} ${table_size_height / 2} 0 0 0"
+    />
+
+    <xacro:cube
+      cube_size="${cube_size}"
+      cube_mass="${cube_mass}"
+      cube_pose="${table_size_width / 2 + 0.1} ${table_size_width / 2} ${table_size_height + cube_size / 2} 0 0 0"
+    />
 
   </world>
 </sdf>

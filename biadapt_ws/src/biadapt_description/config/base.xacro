@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<robot name="BiAdaptRobot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:property name="PI" value="3.141592653589793" />
+
+    <xacro:macro name="box_inertia" params="x y z m">
+        <inertia>
+            <ixx>${m*(y*y+z*z)/12}</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>${m*(x*x+z*z)/12}</iyy>
+            <iyz>0</iyz>
+            <izz>${m*(x*x+y*y)/12}</izz>
+        </inertia>
+    </xacro:macro>
+
+    <xacro:macro name="box"
+        params="prefix box_size_length box_size_width box_size_height box_mass box_pose">
+        <pose>${box_pose}</pose>
+        <link name="${prefix}_link">
+            <visual name="${prefix}_box_visual">
+                <geometry>
+                    <box>
+                        <size>${box_size_length} ${box_size_width} ${box_size_height}</size>
+                    </box>
+                </geometry>
+                <material>
+                    <ambient>0.55 0.45 0.35 1</ambient>
+                    <diffuse>0.55 0.45 0.35 1</diffuse>
+                </material>
+            </visual>
+            <collision name="${prefix}_box_collision">
+                <geometry>
+                    <box>
+                        <size>${box_size_length} ${box_size_width} ${box_size_height}</size>
+                    </box>
+                </geometry>
+                <surface>
+                    <friction>
+                        <ode>
+                            <mu>1.0</mu>
+                            <mu2>1.0</mu2>
+                        </ode>
+                    </friction>
+                </surface>
+            </collision>
+            <inertial>
+                <mass>${box_mass}</mass>
+                <xacro:box_inertia
+                    x="${box_size_length}"
+                    y="${box_size_width}"
+                    z="${box_size_height}"
+                    m="${box_mass}" />
+            </inertial>
+        </link>
+    </xacro:macro>
+</robot>
